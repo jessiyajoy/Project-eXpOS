@@ -1,0 +1,2 @@
+load --exhandler ../spl/spl_progs/haltprog.xsm
+load --int=10 ../spl/spl_progs/haltprog.xsm

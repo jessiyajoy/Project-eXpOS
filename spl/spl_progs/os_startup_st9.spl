@@ -55,7 +55,9 @@ PTLR = 10;
 [76*512] = [65 * 512 + 1];
 SP = 8*512;
 
+//user area page
 [PROCESS_TABLE + 11] = 80;
+//process id 
 [PROCESS_TABLE + 1] = 0;
 [SYSTEM_STATUS_TABLE + 1] = 0;
 
