@@ -1,5 +1,5 @@
 load --os $HOME/myexpos/spl/spl_progs/os_startup_st10.xsm
-load --init $HOME/myexpos/expl/expl_progs/squares_st10.xsm
+load --init $HOME/myexpos/expl/expl_progs/assig11_1.xsm
 load --exhandler ../spl/spl_progs/haltprog.xsm
 load --int=timer $HOME/myexpos/spl/spl_progs/timer_st9.xsm
 load --int=10 ../spl/spl_progs/haltprog.xsm
