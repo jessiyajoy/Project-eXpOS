@@ -1,0 +1,28 @@
+int main() 
+{
+    decl
+        int num, tmp;
+        str title;
+    enddecl
+    begin
+        num = 0;
+        tmp = exposcall("Write", -2, title);
+        while(num<=100) do
+            tmp = num%2;
+            if(tmp == 0) then
+                tmp = exposcall("Write", -2, num);
+            endif;
+            num = num+1;
+        endwhile; 
+        num = 0;
+        tmp = exposcall("Write", -2, title);
+        while(num<=100) do
+            tmp = num%2;
+            if(tmp != 0) then
+                tmp = exposcall("Write", -2, num);
+            endif;
+            num=num+1;
+        endwhile; 
+        return 0;
+    end
+}

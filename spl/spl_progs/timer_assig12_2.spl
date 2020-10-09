@@ -1,4 +1,3 @@
-breakpoint;
 [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP;
 
 // Setting SP to UArea Page number * 512 - 1

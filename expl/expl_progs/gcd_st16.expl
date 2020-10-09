@@ -1,0 +1,21 @@
+int main()
+{
+    decl
+        int r1,qi,r0,ri,tmp;
+    enddecl
+
+   begin
+    tmp = exposcall("Read", -1, r0);
+    tmp = exposcall("Read", -1, r1);
+
+    while(r1 != 0) do
+        qi = r0/r1;
+        ri = r0 - (qi*r1);
+        r0 = r1;
+        r1 = ri;
+    endwhile;
+
+    tmp = exposcall("Write", -2, r0);
+    return 0;
+   end
+}

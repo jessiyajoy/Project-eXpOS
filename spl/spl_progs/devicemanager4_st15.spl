@@ -1,0 +1,22 @@
+alias functionNum R1;
+alias currentPID R2;
+if( functionNum == 3 ) then
+
+    //Calling Acquire Terminal in resource manager module
+    multipush(R0, R1, R2, R3); // number of registers will depend on your code
+    R1 = 8;
+    R2 = currentPID;
+    call MOD_0; 
+    multipop(R0, R1, R2, R3);
+
+    print R3;
+
+    //Calling Release Terminal in resource manager module
+    multipush(R0, R1, R2, R3); // number of registers will depend on your code
+    R1 = 9;
+    R2 = currentPID;
+    call MOD_0; 
+    multipop(R0, R1, R2, R3); 
+endif ;
+
+return;
