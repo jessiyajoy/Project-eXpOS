@@ -1,9 +1,0 @@
-alias cnt R0;
-cnt = 1;
-
-while(cnt<=20) do
- print cnt*cnt;
- cnt = cnt + 1;
-endwhile;
-
-
