@@ -22,7 +22,6 @@ alias inodetable R3;
 while( file < 60 ) do
     inodetable = INODE_TABLE + file*16;
     if( [inodetable + 1 ] == fileName && [inodetable] == EXEC ) then
-        print [inodetable + 1 ];
         goto fileFound;
     endif ;
     file = file + 1;
@@ -118,6 +117,7 @@ while( cnt < 4 ) do
         [PTBR + cnt*2 + 8] = R7;
         [PTBR + cnt*2 + 9] = "0100";
         //code pages
+        
         loadi(R7,[inodetable + 8 + cnt]);
     endif ;
     cnt = cnt + 1;

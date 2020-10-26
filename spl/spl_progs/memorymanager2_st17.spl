@@ -24,14 +24,17 @@ if( functionNum == 1 ) then
     pageIdx = 0;
     while( pageIdx < 128 ) do
         if( [MEMORY_FREE_LIST + pageIdx] == 0 ) then
-            print "MOD 2 free";
+            //print "MOD 2 free";
             R0 = pageIdx;
-            print R0;
+            //print R0;
             break;
         endif ;
         pageIdx = pageIdx + 1;
     endwhile ;
 
+    [MEMORY_FREE_LIST + pageIdx] = 1;
+    
+    breakpoint;
     return;
 endif;
 
@@ -59,6 +62,8 @@ if( functionNum == 2 ) then
         var = var + 1;
     endwhile ;
 
+
+    breakpoint;
     return;
 endif;
 

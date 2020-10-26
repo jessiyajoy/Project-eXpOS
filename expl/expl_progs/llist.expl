@@ -1,0 +1,62 @@
+type
+	linkedlist
+	{
+		int data;
+		linkedlist next;
+	}
+endtype
+
+decl
+	linkedlist insert(linkedlist head,int a);
+enddecl
+
+linkedlist insert(linkedlist head,int a) {
+decl
+	linkedlist p,tmp;
+	int temp;
+enddecl
+begin
+	tmp=exposcall("Alloc");
+	tmp.data=a;
+	tmp.next=null;
+
+	if(head==null) then
+		head=tmp;
+	else
+		p=head;
+		while(p.next != null) do
+			p=p.next;
+		endwhile;
+		p.next=tmp;
+	endif;
+	return head;
+end
+}
+
+int main()
+{
+decl
+	int n,i,x,temp;
+	linkedlist head,ptr;
+enddecl
+begin
+	temp=exposcall("Heapset");
+	head=null;
+	temp=exposcall("Write",-2,"Enter n");
+	temp=exposcall("Read",-1,n);
+	i=0;
+	while(i<n) do
+		temp=exposcall("Read",-1,x);
+		head=insert(head,x);
+		i=i+1;
+	endwhile;
+	i=0;
+	ptr=head;
+	temp=exposcall("Write",-2,"Linked List");
+	while(ptr!=null) do
+		temp=exposcall("Write",-2,ptr.data);
+		ptr=ptr.next;
+	endwhile;
+	return 0;
+end
+}

@@ -1,0 +1,11 @@
+int main()
+{
+    decl
+        int num;
+    enddecl
+    begin
+        num = 0;
+
+        return 0;
+    end
+}

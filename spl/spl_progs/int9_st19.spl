@@ -1,0 +1,164 @@
+//system mode
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 9;
+
+//save user SP for further use
+alias userSP R0;
+userSP = SP;
+
+//save user stack ptr in prcoess table UPTR
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP;
+
+//set SP to KPTR
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1;
+
+//manually calculate file Name(argument 1) physical address and get its value from userSP - 4
+alias fileName R1;
+fileName = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 4)/ 512] * 512 + ((userSP - 4) % 512)];
+
+alias file R2;
+file = 0;
+alias inodetable R3;
+while( file < 60 ) do
+    inodetable = INODE_TABLE + file*16;
+    if( [inodetable + 1 ] == fileName && [inodetable] == EXEC ) then
+        goto fileFound;
+    endif ;
+    file = file + 1;
+endwhile ;
+
+//control reached here implies EXEC file with name fileName not found
+//store -1 return value at userSP - 1
+alias physicalAddrRetVal R4;
+physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
+[physicalAddrRetVal] = -1;
+
+//switch stack
+SP = userSP;
+//mode 
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+
+ireturn;
+
+
+//file found and is an EXEC file
+fileFound :
+
+//invoke Exit function of Process Manager mod 1
+multipush(R0, R1, R2, R3, R4, R5, R6, R7);
+R1 = 3;
+R2 = [SYSTEM_STATUS_TABLE + 1];
+call MOD_1;
+multipop(R0, R1, R2, R3, R4, R5, R6, R7);
+
+//Reclaim same userAreaPage
+
+//get userAreaPage number
+alias userAreaPage R5;
+userAreaPage = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11];
+
+//increment MEMORY_FREE_LIST entry of user area page
+[MEMORY_FREE_LIST + userAreaPage] = [MEMORY_FREE_LIST + userAreaPage] + 1;
+
+//decrement MEM_FREE_COUNT field in SYSTEM_STATUS_TABLE
+[SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] - 1;
+
+//per-process resource table.
+alias cnt R6;
+cnt = 0;
+
+while( cnt < 8 ) do
+    [userAreaPage*512 + 496 + cnt*2] = -1;
+    cnt = cnt + 1;
+endwhile ;
+
+
+
+SP = userAreaPage*512 - 1;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 4] = RUNNING;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 7] = file;
+
+PTBR = PAGE_TABLE_BASE + 20*[SYSTEM_STATUS_TABLE + 1];
+PTLR = 10;
+
+
+
+
+//Library
+[PTBR+0] = 63;
+[PTBR+1] = "0100";
+[PTBR+2] = 64;
+[PTBR+3] = "0100";
+
+//Heap
+
+[PTBR+4] = -1;
+[PTBR+5] = "0000";
+
+[PTBR+6] = -1;
+[PTBR+7] = "0000";
+
+//Stack
+
+multipush(R0, R1, R2, R3, R4, R5);
+R1 = 1;
+call MOD_2;
+[PTBR+16] = R0;
+[PTBR+17] = "0110";
+
+R1 = 1;
+call MOD_2;
+[PTBR+18] = R0;
+[PTBR+19] = "0110";
+multipop(R0, R1, R2, R3, R4, R5);
+
+//Code
+
+//first page alone
+multipush(R0, R1, R2, R3, R4, R5, R6);
+R1 = 5;
+R2 = [INODE_TABLE + file*16 + 8 ];
+call MOD_2;
+R7 = R0;
+multipop(R0, R1, R2, R3, R4, R5, R6);
+[PTBR + 8] = R7;
+[PTBR + 9] = "0100";
+
+
+//invalidate remaining pages
+[PTBR + 10] = -1;
+[PTBR + 11] = "0000";
+[PTBR + 12] = -1;
+[PTBR + 13] = "0000";
+[PTBR + 14] = -1;
+[PTBR + 15] = "0000";
+
+
+//DISK MAP TABLE Initialization
+
+//DISK_MAP_TABLE + PID*10
+alias diskMapTable R7;
+diskMapTable = DISK_MAP_TABLE + [SYSTEM_STATUS_TABLE + 1]*10;
+
+//unused, heap, code, stack
+[ diskMapTable + 0 ] = -1;
+[ diskMapTable + 1 ] = -1;
+[ diskMapTable + 2 ] = -1;
+[ diskMapTable + 3 ] = -1;
+[ diskMapTable + 4 ] = [INODE_TABLE + file*16 + 8 ];
+[ diskMapTable + 5 ] = [INODE_TABLE + file*16 + 9 ];
+[ diskMapTable + 6 ] = [INODE_TABLE + file*16 + 10 ];
+[ diskMapTable + 7 ] = [INODE_TABLE + file*16 + 11 ];
+[ diskMapTable + 8 ] = -1;
+[ diskMapTable + 9 ] = -1;
+
+
+//set entry point in user stack
+[[PTBR+16] *512] = [[PTBR+8]*512 + 1];
+
+
+SP = 8*512;
+//Mode Flag
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+PTLR = 10;
+PTBR = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 14];
+ireturn;
