@@ -1,0 +1,41 @@
+// int main()
+// {
+//     decl
+//         int tmp;
+//     enddecl
+//     begin
+//         tmp = exposcall("Fork");
+//         if (tmp != -1) then
+//         //child
+//             if(tmp == 0) then 
+//                 tmp = exposcall("Exec", "odd.xsm");
+//             else
+//         //parent
+//                 tmp = exposcall("Exec", "even.xsm");    
+//             endif;
+//         endif;
+//         return 0;
+//     end
+// }
+
+
+int main() 
+{
+    decl
+        int tmp,pid;
+    enddecl
+    begin
+        pid = exposcall("Fork");
+        if(pid == -1) then
+            tmp = exposcall("Write", -2, "Fork_Fail");
+        else
+            if(pid != 0) then
+                tmp = exposcall("Exec", "even.xsm");
+            endif;
+            if(pid == 0) then
+                tmp = exposcall("Exec", "odd.xsm");
+            endif;
+        endif;
+        return 0;
+    end 
+}

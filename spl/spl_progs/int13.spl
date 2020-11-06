@@ -1,0 +1,129 @@
+//NUMBER OF SWITCHES TO KERNEL MODULE
+[70*512 + 511] = [70*512 + 511]+1;
+
+
+
+//---- SYSTEM CALLS :
+
+//17. SEMGET SYSTEM CALL
+//18. SEMRELEASE SYSTEM CALL
+
+alias syscallNum R15;
+syscallNum = [([PTBR + 2 * ((SP - 5) / 512)] * 512) + ((SP - 5) % 512)];
+alias userSP R5;
+userSP = SP;
+
+//--Switch Stack
+//save user SP, set SP to KPTR
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP;
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1;
+
+
+//---SEMGET SYSTEM CALL
+//Args - none
+//Return : 
+//  SEMID (Integer) - Success, returns a semaphore descriptor(SEMID)
+//  -1	Process has reached its limit of resources
+//  -2	Number of semaphores has reached its maximum
+
+if(syscallNum == 17) then
+
+    // MODE
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 17;
+    alias resourceTable R6;
+    resourceTable = [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512 + 496;
+
+    //FREE ENTRY in PER PROCESS RESOURCE TABLE
+    alias cnt R7;
+    cnt = 0;
+    while(cnt < 8) do
+        if( [resourceTable + cnt*2] == -1 ) then
+            goto continue1;
+        endif;
+        cnt = cnt + 1;
+    endwhile;
+
+    //no free entry in PER PROCESS RESOURCE TABLE
+    [([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512)] = -1;
+
+    continue1 :
+    alias semDesc R8;
+    semDesc = cnt;
+    [resourceTable + semDesc*2] = 1;
+
+
+    // CALL ACQUIRE_SEMAPHORE, RESOURCE MANAGER 0
+    R1 = 6;
+    R2 = [SYSTEM_STATUS_TABLE+1];
+    multipush(R5, R6, R7, R8);
+    call MOD_0;
+    multipop(R5, R6, R7, R8);
+
+    //no free semaphores (SEMAPHORE table)
+    if(R0 == -1) then
+        [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -2;
+        goto end;
+    endif;
+
+    alias semID R9;
+    semID = R0;
+
+
+    //Attach the semaphore to the process (resource table)
+    [resourceTable + semDesc*2 + 1] = semID;
+
+    //return semDescriptor
+    [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = semDesc;
+
+    goto end;
+endif;
+
+
+
+//---SEMRELEASE SYSTEM CALL
+//Args - Semaphore Descriptor (Integer)
+//Return : 
+//  0	Success
+//  -1	Semaphore Descriptor is invalid
+
+if(syscallNum == 18) then
+
+    // MODE
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 18;
+
+    alias semDesc R6;
+    semDesc = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
+
+    alias resourceTable R7;
+    resourceTable = [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512 + 496;
+
+    //  invalid if not in the range 0 - 7, or if the resource identifier field of the table entry is not 1
+    if([resourceTable + 2*semDesc] != 1 || semDesc > 7 || semDesc<0) then
+        [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
+        goto end;
+    endif;
+    
+    // CALL RELEASE_SEMAPHORE, RESOURCE MANAGER 0
+    R1 = 7;
+    R2 = [resourceTable + 2*semDesc + 1];
+    R3 = [SYSTEM_STATUS_TABLE+1];
+    multipush(R5, R6, R7);
+    call MOD_0;
+    multipop(R5, R6, R7);
+
+    [resourceTable + 2*semDesc] = -1;
+
+    [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = 0;    
+    goto end;
+endif;
+
+
+
+
+
+end :
+//switch stack, mode
+SP = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13]; 
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
+
+ireturn;

@@ -4,9 +4,9 @@ int main()
         int name, tmp;
     enddecl
 
-   begin
-    tmp = exposcall("Read", -1, name);
-    tmp = exposcall("Exec", name);
-    return 0;
-   end
+    begin
+        tmp = exposcall("Read", -1, name);
+        tmp = exposcall("Exec", name);
+        return 0;
+    end
 }

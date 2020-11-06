@@ -1,7 +1,3 @@
-//int 7
-loadi(16,29);
-loadi(17,30);
-
 //library code
 loadi(63,13);
 loadi(64,14);
@@ -10,44 +6,25 @@ loadi(64,14);
 loadi(65,7);
 loadi(66,8);
 
-//int 10
-loadi(22,35);
-loadi(23,36);
-
-//exception handler
-loadi(2, 15);
-loadi(3, 16);
-
-//timer interrupt
-loadi(4, 17);
-loadi(5, 18);
-
 //even.xsm exec file
 loadi(83, 70);
 
-//module_5 scheduler
-loadi(50,63);
-loadi(51,64);
 
-////module_0 Resource Manager
+//DISK DATA STRUCTURES
+
+//inode table
+loadi(59,3);
+loadi(60,4);
+
+//disk free list
+loadi(61 ,2);
+
+
+//-----MODULES
+
+//module_0 Resource Manager
 loadi(40,53);
 loadi(41,54);
-
-//module_4 Device Manager
-loadi(48,61);
-loadi(49,62);
-
-//console interrupt handler
-loadi(8,21);
-loadi(9,22);
-
-//interrupt 6
-loadi(14,27);
-loadi(15,28);
-
-//interrupt 9
-loadi(20,33);
-loadi(21,34);
 
 //module_1 Process Manager
 loadi(42,55);
@@ -57,16 +34,61 @@ loadi(43,56);
 loadi(44,57);
 loadi(45,58);
 
-//inode table
-loadi(59,3);
-loadi(60,4);
+//module_4 Device Manager
+loadi(48,61);
+loadi(49,62);
+
+//module_5 Scheduler
+loadi(50,63);
+loadi(51,64);
+
+
+//------INTERRUPTS
+
+//exception handler
+loadi(2, 15);
+loadi(3, 16);
+
+//timer interrupt
+loadi(4, 17);
+loadi(5, 18);
 
 //disk interrupt handler
 loadi(6,19);
 loadi(7,20);
 
-//disk free list
-loadi(61 ,2);
+//console interrupt handler
+loadi(8,21);
+loadi(9,22);
+
+//interrupt 6
+loadi(14,27);
+loadi(15,28);
+
+//interrupt 7
+loadi(16,29);
+loadi(17,30);
+
+//interrupt 8
+loadi(18,31);
+loadi(19,32);
+
+//interrupt 9
+loadi(20,33);
+loadi(21,34);
+
+//interrupt 10
+loadi(22,35);
+loadi(23,36);
+
+//interrupt 11
+loadi(24,37);
+loadi(25,38);
+
+//interrupt 15
+loadi(32,45);
+loadi(33,46);
+
 
 //INIT PROCESS PAGE TABLE
 

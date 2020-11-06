@@ -1,3 +1,9 @@
+//NUMBER OF SWITCHES TO KERNEL MODULE
+[70*512 + 511] = [70*512 + 511]+1;
+
+
+
+
 //system mode
 [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 5;
 
@@ -27,9 +33,9 @@ fileDescriptor=[fileDescPhysicalAddr];
 if (fileDescriptor != -2)
 then
 	//store -1 return value at userSP - 1
-	 alias physicalAddrRetVal R5;
-	 physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
-	 [physicalAddrRetVal] = -1;
+	alias physicalAddrRetVal R5;
+	physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
+	[physicalAddrRetVal] = -1;
 else
 	 //code when argument 1 is valid
 	alias word R5;
@@ -42,7 +48,7 @@ else
     R3 = word;
     call MOD_4;
     multipop(R0, R1, R2, R3, R4, R5);
-
+    //print [SYSTEM_STATUS_TABLE+1];
 	alias physicalAddrRetVal R6;
 	physicalAddrRetVal = ([PTBR + 2 * (userSP - 1)/ 512] * 512) + ((userSP - 1) % 512);
 	[physicalAddrRetVal] = 0;

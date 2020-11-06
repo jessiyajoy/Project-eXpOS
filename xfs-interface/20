@@ -1,5 +1,5 @@
 load --os ../spl/spl_progs/os_startup.xsm
-load --init ../expl/expl_progs/st20_a2.xsm
+load --init ../expl/expl_progs/st20_a1.xsm
 load --idle ../expl/expl_progs/idle_st12.xsm
 load --module 0 ../spl/spl_progs/resourcemanager0.xsm
 load --module 1 ../spl/spl_progs/processmanager1_st20.xsm

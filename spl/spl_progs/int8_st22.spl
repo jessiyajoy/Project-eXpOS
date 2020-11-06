@@ -1,0 +1,187 @@
+//NUMBER OF SWITCHES TO KERNEL MODULE
+[70*512 + 511] = [70*512 + 511]+1;
+
+
+
+// FORK SYSTEM CALL
+
+//Mode
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 8;
+alias userSP R5;
+userSP = SP;
+
+//--Switch Stack
+//save user SP, set SP to KPTR
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP;
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1;
+
+//GET_PCB_ENTRY, PROCESS MANAGER
+multipush(R5);
+R1 = 1;
+call MOD_1;
+multipop(R5);
+
+//save PID of child
+alias chPID R6; 
+chPID = R0;
+
+if( chPID == -1 ) then
+    //---16 Processes already running
+    //store -1 return value at userSP - 1
+    alias physicalAddrRetVal R15;
+    physicalAddrRetVal = ([PTBR + 2 * ((userSP-1)/512)] * 512) + ((userSP-1)%512);
+    [physicalAddrRetVal] = -1;
+
+    //switch stack, mode
+    goto end;
+endif ;
+
+
+
+//ELSE
+//6 10 9 12
+
+[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+14] = PTBR;
+alias chPTBR R7;
+chPTBR = PAGE_TABLE_BASE + chPID*20;
+alias pPTBR R8;
+pPTBR = PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE+1]*20;
+
+
+//parent & child share same HEAP. if heap pages were not allocated for the parent , allocate it now.
+if( [pPTBR + 4] == -1 || [pPTBR+5] == "0000") then
+    // GET_FREE_PAGE, MEMORY MANAGER
+    multipush(R5, R6, R7, R8);
+    R1=1;
+    call MOD_2;
+    multipop(R5, R6, R7, R8);
+    [ pPTBR + 4]=R0;
+    [ pPTBR + 5]="0110";
+
+    multipush(R5, R6, R7, R8);
+    R1=1;
+    call MOD_2;
+    multipop(R5, R6, R7, R8);
+    [ pPTBR + 6]=R0;
+    [ pPTBR + 7]="0110";
+endif ;
+
+//--Allocate 2 STACK AND USER AREA PAGE
+//GET_FREE_PAGE, MEMORY MANAGER
+multipush(R5, R6, R7, R8);
+R1=1;
+call MOD_2;
+multipop(R5, R6, R7, R8);
+[chPTBR + 16] = R0;
+[chPTBR + 17] = [pPTBR + 17];
+
+multipush(R5, R6, R7, R8);
+R1=1;
+call MOD_2;
+multipop(R5, R6, R7, R8);
+[chPTBR + 18] = R0;
+[chPTBR + 19] = [pPTBR + 19];
+
+
+multipush(R5, R6, R7, R8);
+R1=1;
+call MOD_2;
+multipop(R5, R6, R7, R8);
+[PROCESS_TABLE + chPID*16 + 11] = R0;
+
+
+
+//PROCESS TABLE -- CHILD
+
+//Copy PARENT's Process Table Entry to child 
+//USERID, SWAP FLAG, USER AREA SWAP STATUS, INODE INDEX, UPTR 
+[PROCESS_TABLE + chPID*16 + 3] = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 3];
+[PROCESS_TABLE + chPID*16 + 6] = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 6];
+[PROCESS_TABLE + chPID*16 + 10] = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 10];
+[PROCESS_TABLE + chPID*16 + 7] = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 7];
+[PROCESS_TABLE + chPID*16 + 13] = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
+
+//TICK, MODE FLAG, KPTR = 0
+[PROCESS_TABLE + chPID*16 + 0] = 0;
+[PROCESS_TABLE + chPID*16 + 9] = 0;
+[PROCESS_TABLE + chPID*16 + 12] = 0;
+
+
+//PPID, STATE, USER AREA PAGE NUMBER
+[PROCESS_TABLE + chPID*16 + 2] = [SYSTEM_STATUS_TABLE + 1];
+[PROCESS_TABLE + chPID*16 + 4] = CREATED;
+//[PROCESS_TABLE + chPID*16 + 11] = ua;
+
+//PID, PTBR, PTLR already initialized Get Pcb Entry function
+//no need to initialize INPUT BUFFER.
+
+
+//PER-PROCESS RESOURCE TABLE -- CHILD
+alias cnt R9;
+cnt = 0;
+alias resourceTable R15;
+resourceTable = [PROCESS_TABLE + chPID*16 + 11]*512 + 496;
+while( cnt < 16 ) do
+    [resourceTable + cnt] = [ [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11] * 512 + 496 + cnt];
+
+    //If the resource is semaphore (check the Resource Identifier field in the per-process resource table)
+    //using the sempahore table index, 
+    //increment the PROCESS COUNT field in the semaphore table entry
+    if( cnt%2 == 0 &&  [resourceTable + cnt]==1 ) then
+        [SEMAPHORE_TABLE + [resourceTable + cnt + 1]*4 + 1] = [SEMAPHORE_TABLE + [resourceTable + cnt + 1]*4 + 1] + 1;
+    endif ;
+    cnt = cnt + 1;
+endwhile ;
+
+
+
+//DISK_MAP_TABLE -- CHILD
+
+alias diskMapTable R10;
+diskMapTable = DISK_MAP_TABLE + 10*chPID;
+cnt = 0;
+while( cnt < 10 ) do
+    [ diskMapTable + cnt ] = [DISK_MAP_TABLE + [SYSTEM_STATUS_TABLE+1] * 10 + cnt];
+    cnt = cnt + 1;
+endwhile ;
+
+
+//PAGE_TABLE -- CHILD
+
+cnt = 0;
+while( cnt < 8 ) do
+    [chPTBR + cnt*2] = [pPTBR + cnt*2];
+    [chPTBR + cnt*2 +1] = [pPTBR + cnt*2 +1];
+    [MEMORY_FREE_LIST + [chPTBR + cnt*2]] = [MEMORY_FREE_LIST + [chPTBR + cnt*2]] + 1;
+    cnt = cnt + 1;
+endwhile ;
+
+
+//Copy word by word the contents of the parent user stack to that of the child.
+cnt = 0;
+while( cnt < 512 ) do
+    [[chPTBR + 16]*512 + cnt] = [[pPTBR + 16]*512 + cnt];
+    [[chPTBR + 18]*512 + cnt] = [[pPTBR + 18]*512 + cnt];
+    cnt = cnt + 1;
+endwhile ;
+
+
+//Store the value in the BP register on top of the kernel stack of child process. 
+//This value will be used to initialize the BP register of the child process by the scheduler when the child is scheduled for the first time.
+[[PROCESS_TABLE + chPID*16 + 11]*512] = BP;
+
+
+//---Store return value at userSP - 1
+//PARENT : Child PID
+//CHILD : 0
+alias physicalAddrRetVal R15;
+physicalAddrRetVal = ([pPTBR + 2*((userSP-1)/512)] * 512) + ((userSP-1)%512);
+[physicalAddrRetVal] = chPID;
+physicalAddrRetVal = ([chPTBR + 2*((userSP-1)/512)] * 512) + ((userSP-1)%512);
+[physicalAddrRetVal] = 0;
+
+end:
+//switch stack, mode
+SP = userSP; 
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
+ireturn;

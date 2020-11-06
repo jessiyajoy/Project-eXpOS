@@ -1,0 +1,136 @@
+alias functionNum R1;
+
+// --- ACQUIRE_DISK 3
+// Args -- PID;     Return NIL
+if( functionNum == 3 ) then
+    alias currentPID R2;
+    while( [DISK_STATUS_TABLE] == 1 ) do
+        [ PROCESS_TABLE + 16*currentPID + 4 ] = WAIT_DISK;
+
+        multipush(R0, R1, R2);
+        //call module 5
+        call SCHEDULER;
+        multipop(R0, R1, R2);
+
+    endwhile ;
+
+    //When the disk is finally free, the process is woken up by the disk interrupt handler
+
+    //free (0) busy (1)
+    [DISK_STATUS_TABLE] = 1;
+    [DISK_STATUS_TABLE + 4] = currentPID;
+
+    return;
+endif;
+
+
+
+// --- ACQUIRE_SEMAPHORE 6
+// Args -- PID; Return NIL	
+if( functionNum == 6 ) then
+    alias currentPID R2;
+    alias cnt R5;
+    cnt = 0;
+    while(cnt < 32) do
+        //free entry is indicated by a Process Count of 0.
+        if( [SEMAPHORE_TABLE + cnt*4 + 1] == 0 ) then
+            goto continue1;
+        endif;
+        cnt = cnt + 1;
+    endwhile;
+
+    //no free entry in semaphore table
+    R0 = -1;
+    return;
+
+    continue1 : // LOCKING_PID to -1, PROCESS_COUNT to 1
+    [SEMAPHORE_TABLE + cnt*4 + 0] = -1;
+    [SEMAPHORE_TABLE + cnt*4 + 1] = 1;
+
+    //return Semaphore table index
+    R0 = cnt;
+    return;
+
+endif;
+
+
+
+// --- RELEASE_SEMAPHORE 7
+// Args -- Semaphore Table Index, PID ;    Return 0 or -1
+if( functionNum == 7 ) then
+    alias semID R2;
+    alias currentPID R3;
+    // - if semaphore is locked by current process
+    if ( [SEMAPHORE_TABLE + semID*4] != -1 ) then
+        // unlock semaphore before release
+        [SEMAPHORE_TABLE + semID*4] = -1;
+
+        //wake up processes blocked by the semaphore
+        alias cnt R5;
+        cnt = 0;
+        while ( cnt < 16) do
+            if ([PROCESS_TABLE + cnt*16 + 4]==WAIT_SEMAPHORE && [PROCESS_TABLE + cnt*16 + 5]==semID) then
+                [PROCESS_TABLE + cnt*16 + 4]= READY;
+            endif;
+            cnt = cnt + 1;
+        endwhile;
+    endif;
+
+    // decrement process count in semaphore table
+    // when count becomes 0, semaphore is free
+    [SEMAPHORE_TABLE + semID*4 + 1] = [SEMAPHORE_TABLE + semID*4 + 1] - 1;
+    return;
+endif;
+
+
+
+// --- ACQUIRE_TERMINAL 8
+// Args -- PID;     Return NIL
+if( functionNum == 8 ) then
+    alias currentPID R2;
+
+    while( [TERMINAL_STATUS_TABLE] == 1 ) do
+        [ PROCESS_TABLE + 16*currentPID + 4 ] = WAIT_TERMINAL;
+        multipush(R0, R1, R2);
+
+        //call module 5
+        call SCHEDULER;
+
+        multipop(R0, R1, R2);
+    endwhile ;
+    [TERMINAL_STATUS_TABLE] = 1;
+    [TERMINAL_STATUS_TABLE + 1] = currentPID;
+    return;
+endif;
+
+
+
+// --- RELEASE_TERMINAL = 9
+// Args -- PID;  Return	0 or -1
+if( functionNum == 9 ) then
+    alias currentPID R2;
+
+    // check if process trying to release terminal without acquiring it
+    if( [TERMINAL_STATUS_TABLE + 1] != currentPID ) then
+        R0 = -1;
+        return;
+    endif ;
+
+    //Change STATE field in Terminal Status table (terminal released)
+    [TERMINAL_STATUS_TABLE] = 0;
+
+    //Update STATUS to READY for all processes (valid PID) with WAIT_TERMINAL status
+    alias var R3;
+    var = 1;
+    while( var < 16 ) do
+        alias processTable R4;
+        processTable = PROCESS_TABLE + 16*var;
+        if( [processTable + 1] != -1 && [processTable + 4] == WAIT_TERMINAL) then
+            [processTable + 4] = READY;
+        endif ;
+        var = var + 1;
+    endwhile ;
+
+    R0 = 0;
+    return;
+endif;

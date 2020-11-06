@@ -1,9 +1,10 @@
+
 alias functionNum R1;
 //Functions GET_FREE_PAGE(1), RELEASE_PAGE(2), RELEASE_BLOCK(4), GET_CODE_PAGE(5)
 
 
 //---FINAL---
-//GET_FREE_PAGE = 1 ----- Args - NIL, Free Page Number
+//GET_FREE_PAGE = 1 ----- Args - NIL,Ret Free Page Number
 
 if( functionNum == 1 ) then
 
@@ -22,6 +23,11 @@ if( functionNum == 1 ) then
     //Decrement MEM_FREE_COUNT & WAIT_MEM_COUNT in system status table
     [SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] - 1;
     [SYSTEM_STATUS_TABLE + 3] = [SYSTEM_STATUS_TABLE + 3] - 1;
+
+    //max mem usage
+    if (128 - [SYSTEM_STATUS_TABLE + 2] > [70*512 + 510] ) then
+        [70*512 + 510] = 128 - [SYSTEM_STATUS_TABLE + 2];
+    endif;
 
     //Find a free page using memory free list
     alias pageIdx R2;
@@ -136,4 +142,3 @@ if( functionNum == 5 ) then
     breakpoint;
     return;
 endif;
-

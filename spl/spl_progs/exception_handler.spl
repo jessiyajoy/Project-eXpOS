@@ -1,3 +1,7 @@
+//NUMBER OF SWITCHES TO KERNEL MODULE
+[70*512 + 511] = [70*512 + 511]+1;
+
+
 // ----- FINAL ------
 
 
