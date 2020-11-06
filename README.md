@@ -1,3 +1,4 @@
 # Project-eXpOS
-An online project to learn the working of an operating system.
-credits : https://exposnitc.github.io/
+Build a very simple multi-user multi-tasking operating system from scratch.
+
+For more details, visit : https://exposnitc.github.io/
