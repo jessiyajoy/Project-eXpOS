@@ -1,0 +1,132 @@
+//Functions : DISK_STORE(1), DISK_LOAD(2), TERMINAL_WRITE(3), FREE_PAGE_TABLE(4)
+
+
+alias functionNum R1;
+alias currentPID R2;
+
+
+// DISK_STORE 
+// Args - PID, Page Number, Block Number; Return NIL
+// Called by Shutdown, Buffer Read and Buffer Write.
+
+if( functionNum == 1 ) then
+    alias pageNo R3;
+    alias blockNo R4;
+
+    //Call Acquire Disk function in resource manager module
+    multipush(R2, R3, R4); 
+    R1 = 3;
+    R2 = currentPID;
+    call MOD_0; 
+    multipop(R2, R3, R4);
+
+    //LOAD/STORE BIT, PAGE NUMBER and BLOCK NUMBER in the Disk Status Table
+    [DISK_STATUS_TABLE + 1] = 1;
+    [DISK_STATUS_TABLE + 2] = pageNo;
+    [DISK_STATUS_TABLE + 3] = blockNo;
+
+    store(pageNo, blockNo);
+
+    [PROCESS_TABLE + ( currentPID * 16) + 4] = WAIT_DISK;
+
+    //call module 5 SCHEDULER
+    call SCHEDULER;
+
+    return;
+endif ;
+
+
+
+// DISK_LOAD 
+// Args - PID, Page Number, Block Number; Return NIL
+//Called by Buffer Read, Buffer Write functions, exec system call (to load first code page) and exception handler (demand paging).
+
+if( functionNum == 2 ) then
+
+    alias pageNo R3;
+    alias blockNo R4;
+
+    //Calling Acquire Disk function in resource manager module (module 0)
+    multipush(R2, R3, R4); 
+    R1 = 3;
+    R2 = currentPID;
+    call MOD_0; 
+    multipop(R2, R3, R4);
+
+    //LOAD/STORE BIT, PAGE NUMBER and BLOCK NUMBER in the Disk Status Table
+    [DISK_STATUS_TABLE + 1] = 0;
+    [DISK_STATUS_TABLE + 2] = pageNo;
+    [DISK_STATUS_TABLE + 3] = blockNo;
+
+
+    //DISK ACCESS COUNT
+    [70*512 + 508] = [70*512 + 508] + 1;
+
+    load(pageNo, blockNo);
+
+    [PROCESS_TABLE + ( currentPID * 16) + 4] = WAIT_DISK;
+    //call module 5 SCHEDULER
+    call SCHEDULER;
+    
+    return;
+endif ;
+
+
+
+
+// TERMINAL_WRITE
+// Args - PID, Address; Return NIL
+// Called by Write system call
+
+if( functionNum == 3 ) then
+
+    //Calling Acquire Terminal in resource manager module
+    multipush(R2, R3); 
+    R1 = 8;
+    R2 = currentPID;
+    call MOD_0; 
+    multipop(R2, R3);
+
+    print R3;
+
+    //Calling Release Terminal in resource manager module
+    multipush(R2, R3);
+    R1 = 9;
+    R2 = currentPID;
+    call MOD_0; 
+    multipop(R2, R3); 
+    return;
+endif ;
+
+
+
+// TERMINAL_READ
+// Args - PID, Word; Return NIL
+//Called by Read system call
+
+if( functionNum == 4 ) then
+
+    //Calling Acquire Terminal in resource manager module
+    multipush(R2, R3);
+    R1 = 8;
+    R2 = currentPID;
+    call MOD_0; 
+    multipop(R2, R3);
+    read;
+
+    //Change state of process to WAIT_TERMINAL
+    [PROCESS_TABLE + ( currentPID * 16) + 4] = WAIT_TERMINAL;
+    //call module 5 SCHEDULER
+    multipush(R2, R3);
+    call SCHEDULER;
+    multipop(R2, R3);
+
+    //find physical address where input word to be stored
+    //Store value in input buffer field of process table to this address
+    alias physicalAddrInput R4;
+	physicalAddrInput = ([PTBR + 2 * (R3 / 512)] * 512) + (R3 % 512);
+	[physicalAddrInput] = [PROCESS_TABLE + ( currentPID * 16) + 8];
+
+    //NOte : Release Terminal for terminal read is in Console Interrupt Handler
+    return;
+endif ;

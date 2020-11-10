@@ -38,7 +38,6 @@ endwhile ;
 alias physicalAddrRetVal R4;
 physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
 [physicalAddrRetVal] = -1;
-
 //switch stack
 SP = userSP;
 //mode 

@@ -1,0 +1,13 @@
+load --exec ../expl/expl_progs/even.xsm
+load --exec ../expl/expl_progs/odd.xsm
+load --exec ../expl/expl_progs/prime.xsm
+load --exec ../expl/expl_progs/llist.xsm
+load --exec ../expl/expl_progs/pid.xsm
+load --exec ../expl/expl_progs/3fork.xsm
+load --exec ../expl/expl_progs/test4rw.xsm
+load --exec ../expl/expl_progs/parent.xsm
+load --exec ../expl/expl_progs/child.xsm
+load --exec ../expl/expl_progs/merge1.xsm
+load --exec ../expl/expl_progs/merge2.xsm
+load --exec ../expl/expl_progs/cfile.xsm
+load --exec ../expl/expl_progs/dfile.xsm
