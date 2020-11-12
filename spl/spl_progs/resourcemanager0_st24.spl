@@ -1,0 +1,285 @@
+// ACQUIRE_DISK 3, ACQUIRE_INODE 4, RELEASE_INODE 5, ACQUIRE_SEMAPHORE 6, RELEASE_SEMAPHORE 7
+// ACQUIRE_TERMINAL 8, RELEASE_TERMINAL 9
+
+
+alias functionNum R1;
+alias processEntry R15;
+
+
+// --- ACQUIRE_BUFFER 1
+// Args -- Buffer Number, PID;     Return NIL
+//Called by BufRead and BufWrite functions in the File Manager
+
+if( functionNum == 1 ) then
+    alias bufferNumber R5;
+    bufferNumber = R2;
+    alias currentPID R6;
+    currentPID = R3;
+
+    alias bufferEntry R7;
+    bufferEntry = BUFFER_TABLE + bufferNumber*4;
+    while( [bufferEntry + 2] != -1 ) do
+        [ PROCESS_TABLE + 16*currentPID + 4 ] = WAIT_BUFFER;
+        [ PROCESS_TABLE + 16*currentPID + 5 ] = bufferNumber;
+
+        multipush(R5, R6, R7);
+        //call module 5
+        call SCHEDULER;
+        multipop(R5, R6, R7);
+
+    endwhile ;
+
+    //When buffer is free
+    //free (0) busy (1)
+    [bufferEntry + 2] = currentPID;
+
+    return;
+endif;
+
+
+
+
+// --- RELEASE_BUFFER 2
+// Args -- Buffer Number, PID;     Return 0 or -1
+//Called by BufRead and BufWrite functions in the File Manager
+
+if( functionNum == 2 ) then
+    alias bufferNumber R5;
+    bufferNumber = R2;
+    alias PID R6;
+    PID = R3;
+
+    alias bufferEntry R7;
+    bufferEntry = BUFFER_TABLE + bufferNumber*4;
+
+    [bufferEntry + 2] = -1;
+
+    //wake up processes blocked by the buffer
+    alias cnt R8;
+    cnt = 0;
+    while ( cnt < 16) do
+        if ([PROCESS_TABLE + cnt*16 + 4]==WAIT_BUFFER && [PROCESS_TABLE + cnt*16 + 5]==bufferNumber) then
+            [PROCESS_TABLE + cnt*16 + 4]= READY;
+        endif;
+        cnt = cnt + 1;
+    endwhile;
+
+    return;
+endif;
+
+
+
+
+// --- ACQUIRE_DISK 3
+// Args -- PID;     Return NIL
+// Called by BufRead and BufWrite functions in the File Manager, exception handler for swap-in
+if( functionNum == 3 ) then
+    alias currentPID R2;
+    while( [DISK_STATUS_TABLE] == 1 ) do
+        [ PROCESS_TABLE + 16*currentPID + 4 ] = WAIT_DISK;
+
+        multipush(R0, R1, R2);
+        //call module 5
+        call SCHEDULER;
+        multipop(R0, R1, R2);
+
+    endwhile ;
+
+    //When the disk is finally free, the process is woken up by the disk interrupt handler
+
+    //free (0) busy (1)
+    [DISK_STATUS_TABLE] = 1;
+    [DISK_STATUS_TABLE + 4] = currentPID;
+
+    return;
+endif;
+
+
+
+
+// --- ACQUIRE_INODE 4
+// Args -- inodeindex, PID; 
+// Return 0 or -1	
+// Called by Delete, Read, Write and Seek system calls.
+if( functionNum == 4 ) then
+    alias inodeIdx R2;
+    alias currentPID R3;
+
+    // BUSY WAIT till file becomes available for locking (lock field File Status Table)
+    //print "hi";
+    while( [FILE_STATUS_TABLE + 4*inodeIdx] != -1 ) do
+        // state = ( WAIT_FILE , Inode Index )
+        [ PROCESS_TABLE + 16*currentPID + 4 ] = WAIT_FILE;
+        [ PROCESS_TABLE + 16*currentPID + 5 ] = inodeIdx;
+
+        multipush(R0, R1, R2);
+        call SCHEDULER;
+        multipop(R0, R1, R2);
+
+    endwhile ;
+    //print "bye";
+    //if file deleted by now
+    if( [INODE_TABLE + 16*inodeIdx + 1] == -1) then
+        R0 = -1;
+        return;
+    endif;
+
+    //lock the file (locking pid in file status table)
+    [FILE_STATUS_TABLE + 4*inodeIdx + 0] = currentPID;
+
+    R0 = 0;
+    return;
+
+endif;
+
+
+
+// --- RELEASE_INODE 5
+// Args -- Inodeindex, PID ;    
+// Return 0 or -1
+// Called by Read, Write and Seek system calls
+if( functionNum == 5 ) then
+    alias inodeIdx R2;
+    alias currentPID R3;
+
+    if( [FILE_STATUS_TABLE + 4*inodeIdx + 0] != currentPID) then
+        R0 = -1;
+        return;
+    endif;
+
+    [FILE_STATUS_TABLE + 4*inodeIdx + 0] = -1;
+
+    //wake up processes blocked by the inode
+    alias cnt R5;
+    cnt = 0;
+    while ( cnt < 16) do
+        if ([PROCESS_TABLE + cnt*16 + 4]==WAIT_FILE && [PROCESS_TABLE + cnt*16 + 5]==inodeIdx) then
+            [PROCESS_TABLE + cnt*16 + 4]= READY;
+        endif;
+        cnt = cnt + 1;
+    endwhile;
+
+    R0 = 0;
+    return;
+endif;
+
+
+
+
+// --- ACQUIRE_SEMAPHORE 6
+// Args -- PID; Return NIL
+// Called by the Semget system call.
+
+if( functionNum == 6 ) then
+    alias currentPID R2;
+    alias cnt R5;
+    cnt = 0;
+    while(cnt < 32) do
+        //free entry is indicated by a Process Count of 0.
+        if( [SEMAPHORE_TABLE + cnt*4 + 1] == 0 ) then
+            goto continue1;
+        endif;
+        cnt = cnt + 1;
+    endwhile;
+
+    //no free entry in semaphore table
+    R0 = -1;
+    return;
+
+    continue1 : // LOCKING_PID to -1, PROCESS_COUNT to 1
+    [SEMAPHORE_TABLE + cnt*4 + 0] = -1;
+    [SEMAPHORE_TABLE + cnt*4 + 1] = 1;
+
+    //return Semaphore table index
+    R0 = cnt;
+    return;
+
+endif;
+
+
+
+// --- RELEASE_SEMAPHORE 7
+// Args -- Semaphore Table Index, PID ;    Return 0 or -1
+// Called by the Semrelease and exit system call.
+
+if( functionNum == 7 ) then
+    alias semID R2;
+    alias currentPID R3;
+    // - if semaphore is locked by current process
+    if ( [SEMAPHORE_TABLE + semID*4] != -1 ) then
+        // unlock semaphore before release
+        [SEMAPHORE_TABLE + semID*4] = -1;
+
+        //wake up processes blocked by the semaphore
+        alias cnt R5;
+        cnt = 0;
+        while ( cnt < 16) do
+            if ([PROCESS_TABLE + cnt*16 + 4]==WAIT_SEMAPHORE && [PROCESS_TABLE + cnt*16 + 5]==semID) then
+                [PROCESS_TABLE + cnt*16 + 4]= READY;
+            endif;
+            cnt = cnt + 1;
+        endwhile;
+    endif;
+
+    // decrement process count in semaphore table
+    // when count becomes 0, semaphore is free
+    [SEMAPHORE_TABLE + semID*4 + 1] = [SEMAPHORE_TABLE + semID*4 + 1] - 1;
+    return;
+endif;
+
+
+
+// --- ACQUIRE_TERMINAL 8
+// Args -- PID;     Return NIL
+// Called by the Terminal Read and Terimnal Write functions of Device Manager Module.
+
+if( functionNum == 8 ) then
+    alias currentPID R2;
+
+    while( [TERMINAL_STATUS_TABLE] == 1 ) do
+        [ PROCESS_TABLE + 16*currentPID + 4 ] = WAIT_TERMINAL;
+        multipush(R0, R1, R2);
+
+        //call module 5
+        call SCHEDULER;
+
+        multipop(R0, R1, R2);
+    endwhile ;
+    [TERMINAL_STATUS_TABLE] = 1;
+    [TERMINAL_STATUS_TABLE + 1] = currentPID;
+    return;
+endif;
+
+
+
+// --- RELEASE_TERMINAL = 9
+// Args -- PID;  Return	0 or -1
+// Called by the Terimnal Write function in the Device Manager Module.
+
+if( functionNum == 9 ) then
+    alias currentPID R2;
+
+    // check if process trying to release terminal without acquiring it
+    if( [TERMINAL_STATUS_TABLE + 1] != currentPID ) then
+        R0 = -1;
+        return;
+    endif ;
+
+    //Change STATE field in Terminal Status table (terminal released)
+    [TERMINAL_STATUS_TABLE] = 0;
+
+    //Update STATUS to READY for all processes (valid PID) with WAIT_TERMINAL status
+    alias var R3;
+    var = 1;
+    while( var < 16 ) do
+        alias processTable R4;
+        processTable = PROCESS_TABLE + 16*var;
+        if( [processTable + 1] != -1 && [processTable + 4] == WAIT_TERMINAL) then
+            [processTable + 4] = READY;
+        endif ;
+        var = var + 1;
+    endwhile ;
+
+    R0 = 0;
+    return;
+endif;

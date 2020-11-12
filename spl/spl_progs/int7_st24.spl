@@ -1,0 +1,101 @@
+
+// WRITE SYSTEM CALL
+
+// Arguments: File Descriptor(Integer) and the word to be written
+// Return Value:
+//  0	Success
+// -1	File Descriptor given is invalid
+// -2	No disk space / File Full
+// -3	Permission denied
+
+
+
+
+
+//system mode
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 5;
+
+//save user SP for further use
+alias userSP R5;
+userSP = SP;
+
+//save user stack ptr in prcoess table UPTR
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP;
+
+//set SP to KPTR
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1;
+
+alias fileDesc R6;
+fileDesc = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
+
+//if fileDescriptor is terminal(=-1) extract arg 2 from userSP - 3, print it, store 0(success) return value at userSP - 1
+
+if (fileDescriptor == -2) then
+
+    alias word R5;
+	word = [[PTBR + 2 * ((userSP - 3) / 512)] * 512 + ((userSP - 3) % 512)];
+
+    //invoke Terminal Write function
+    multipush(R0, R1, R2, R3, R4, R5);
+    R1 = 3;
+    R2 = [SYSTEM_STATUS_TABLE + 1];
+    R3 = word;
+    call MOD_4;
+    multipop(R0, R1, R2, R3, R4, R5);
+    //print [SYSTEM_STATUS_TABLE+1];
+	[([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = 0;
+    goto end;
+
+else
+
+    //If file descriptor (not in range 0 to 7)  is invalid, return -1. 
+    if (fileDesc < 0 || fileDesc > 7) then
+        [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
+        goto end;
+    endif;
+
+    alias word R7;
+    word = [[PTBR + 2 * ((userSP - 3) / 512)] * 512 + ((userSP - 3) % 512)];
+
+    alias resourceTableEntry R8;
+    resourceTableEntry = [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512 + RESOURCE_TABLE_OFFSET + 2*fileDesc;
+
+    // resource identifier field Resource Table entry is not file, return -1
+    if( [resourceTableEntry] != FILE ) then
+        [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
+        goto end;
+    endif ;
+
+    alias openFileTableEntry R9;
+    openFileTableEntry = OPEN_FILE_TABLE + 4*[resourceTableEntry + 1];
+
+    alias inodeIndex R10;
+    inodeIndex = [openFileTableEntry];
+
+    alias inodeEntry R11;
+    inodeEntry = INODE_TABLE +16*inodeIndex;
+
+    if([inodeEntry + 4] == EXCLUSIVE) then
+        if( [processEntry + 3] != 1 && [processEntry + 3] != [inodeEntry + 3]) then
+            // user has no permission to delete file, return -1
+            [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -3;
+            goto end;
+        endif ;
+    endif;
+
+
+
+
+
+/////store -1 return value at userSP - 1
+	///alias physicalAddrRetVal R5;
+//	physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
+	//[physicalAddrRetVal] = -1;
+	
+endif;
+
+
+end : 
+SP = userSP;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+ireturn;

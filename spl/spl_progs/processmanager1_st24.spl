@@ -1,0 +1,177 @@
+alias functionNum R1;
+//Functions : GET_PCB_ENTRY(1), FREE_USER_AREA_PAGE(2), EXIT_PROCESS(3), FREE_PAGE_TABLE(4)
+alias PID R2;
+
+//--FINAL
+// //GET_PCB_ENTRY = 1------ Args - NIL, Return Index of Free PCB.
+if(functionNum == 1) then
+    alias cnt R10;
+    // Loop the process table to find free space and if found, set it up
+    cnt = 0;
+    while( cnt < 16 ) do
+        if([PROCESS_TABLE + cnt*16 + 4] == TERMINATED) then
+            // Set PID to index
+            [PROCESS_TABLE + cnt*16 + 1] = cnt;
+            // Set State
+            [PROCESS_TABLE + cnt*16 + 4] = ALLOCATED;
+            // Set PTBR and PTLR fields
+            [PROCESS_TABLE + cnt*16 + 14] = PAGE_TABLE_BASE + cnt*20;
+            [PROCESS_TABLE + cnt*16 + 15] = 10;
+            R0 = cnt;
+            return;
+        endif;
+        cnt = cnt + 1;
+    endwhile;
+    R0 = -1;
+    return;
+endif;
+
+//--FINAL
+//FREE_USER_AREA_PAGE = 2 ------ Args - PID, Return NIL
+
+if( functionNum == 2 ) then
+    alias currentPID R7;
+    R7 = R2;
+
+    alias resourceTable R5;
+    resourceTable = [PROCESS_TABLE+currentPID*16+11]*512 + 496;
+
+    alias cnt R6;
+    cnt = 0;
+    while( cnt < 8 ) do
+        if( [resourceTable + 2*cnt] == 1 ) then
+            R1 = 7;
+            R2 = [resourceTable + 2*cnt + 1];
+            R3 = currentPID;
+            multipush(R5, R6, R7);
+            call RESOURCE_MANAGER;
+            multipop(R5, R6, R7);  
+        endif;
+        if( [resourceTable + 2*cnt] == 0 ) then
+            R1 = 4;
+            R2 = [resourceTable + 2*cnt + 1];
+            multipush(R5, R6, R7);
+            call FILE_MANAGER;
+            multipop(R5, R6, R7);    
+        endif ;
+        cnt = cnt + 1;
+    endwhile;
+
+    //invoke Release Page function of Memory Manager Mod 2 
+    multipush(R2);
+    R1 = 2;
+    R2 = [PROCESS_TABLE + currentPID* 16 + 11];
+    call MOD_2;
+    multipop(R2);
+
+
+    return;
+endif;
+
+
+
+//---FINAL
+//EXIT_PROCESS = 3 ------ Args - PID, Return NIL
+if( functionNum == 3 ) then
+    alias currentPID R2;
+
+    //invoke FREE_USER_AREA_PAGE function of Process Manager mod 1    
+    multipush(R2);
+    R1 = 2;
+    R2 = currentPID;
+    call MOD_1;
+    multipop(R2);
+
+    //invoke FREE_PAGE_TABLE function of Process Manager mod 1    
+    multipush(R2);
+    R1 = 4;
+    R2 = currentPID;
+    call MOD_1;
+    multipop(R2);
+
+    //Set state as TERMINATED
+    [PROCESS_TABLE + currentPID* 16 + 4] = TERMINATED;
+
+    //If MODE FLAG field not equal to 9 (Exec)
+    //Loop through the process table of all processes
+    //change the state to READY for the processes whose state is tuple (WAIT_PROCESS, current PID)
+    //if PPID of a process is PID of current process, invalidate PPID field to -1.
+
+    if( [PROCESS_TABLE + currentPID*16 + 9] != 9 ) then
+        alias cnt R15;
+        cnt = 0;
+        while( cnt < 16 ) do
+            if( [PROCESS_TABLE + 16*cnt + 4] == WAIT_PROCESS &&  [PROCESS_TABLE + 16*cnt + 5] == currentPID) then
+                [PROCESS_TABLE + 16*cnt + 4] = READY;
+            endif ;
+            if([PROCESS_TABLE + 16*cnt + 2] == currentPID) then
+                [PROCESS_TABLE + 16*cnt + 2] = -1;
+            endif ;
+            cnt = cnt + 1;
+        endwhile;
+    endif ;
+    return;
+endif;
+
+
+
+//---FINAL---
+//--FREE_PAGE_TABLE = 4 ------ Args - PID, Return NIL
+
+if( functionNum == 4 ) then
+    alias currentPID R2;
+    
+    PTBR = PAGE_TABLE_BASE + 20*currentPID;
+    PTLR = 10;
+
+    // Library
+    [PTBR + 0] = -1;
+	[PTBR + 1] = "0000";
+	[PTBR + 2] = -1;
+	[PTBR + 3] = "0000";
+    alias cnt R3;
+    cnt = 2;
+    while( cnt < 10 ) do
+        if([PTBR + cnt*2] != -1) then
+
+            //invoke Release Page function of Memory Manager Mod 2 
+            multipush(R2, R3);
+            R1 = 2;
+            R2 = [PTBR + cnt*2];
+            call MOD_2;
+            multipop(R2, R3);
+        endif ;
+        [PTBR + cnt*2] = -1;        
+        [PTBR + cnt*2 + 1] = "0000";
+        cnt = cnt + 1;
+    endwhile ;
+    alias diskMapTable R4;
+    diskMapTable = DISK_MAP_TABLE + 10*currentPID;
+    cnt = 2;
+        while(cnt < 10) do
+            if([diskMapTable + cnt] != -1) then
+                //Release Block function (Memory Manager Mod 2 )
+                multipush(R2, R3, R4);
+                R3 = currentPID;
+                R2 = [diskMapTable + cnt];
+                R1 = 4;
+                call MOD_2;
+                multipop(R2, R3, R4);
+            endif ;
+
+            if( cnt == 3 ) then
+                cnt = 8;
+            else
+                cnt = cnt + 1;
+            endif ;
+        endwhile;
+
+    // Invalidate the DISK MAP TABLE 
+	cnt = 0;
+	while(cnt <= 9) do
+		[DISK_MAP_TABLE + currentPID*10 + cnt] = -1;
+        cnt = cnt + 1;
+	endwhile;
+
+    return;
+endif;

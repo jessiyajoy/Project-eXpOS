@@ -31,7 +31,7 @@ if(syscallNum == 19) then
     // MODE
     [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 19;
 
-    alias semDesc R5;
+    alias semDesc R8;
     semDesc = [([PTBR + 2*((userSP-4)/512)]*512) + (userSP-4)%512];
 
     alias resourceTable R7;
@@ -49,15 +49,10 @@ if(syscallNum == 19) then
         [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 4] = WAIT_SEMAPHORE;
         [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 5] = [resourceTable + 2*semDesc + 1];
 
-        multipush(R5, R7);
+        multipush(R5, R7, R8);
         call MOD_5;
-        multipop(R5, R7);
+        multipop(R5, R7, R8);
     endwhile;
-
-    // print "locked";
-    // print semDesc;
-    // print "by";
-    // print [SYSTEM_STATUS_TABLE+1];
 
     // when semaphore becomes free for locking
     [SEMAPHORE_TABLE + 4*[resourceTable + 2*semDesc + 1] ] =  [SYSTEM_STATUS_TABLE+1];
@@ -80,7 +75,7 @@ if(syscallNum == 20) then
     // MODE
     [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 20;
 
-    alias semDesc R5;
+    alias semDesc R8;
     semDesc = [([PTBR + 2*((userSP-4)/512)]*512) + (userSP-4)%512];
 
     alias resourceTable R6;
@@ -115,10 +110,6 @@ if(syscallNum == 20) then
         endwhile;
     endif ;
 
-    // print "unlocked";
-    // print semDesc;
-    // print "from";
-    // print [SYSTEM_STATUS_TABLE+1];
 
     [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = 0;    
     goto end;
