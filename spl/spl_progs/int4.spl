@@ -178,22 +178,24 @@ if(syscallNum == 4) then
     cnt = 0;
     while( cnt < 4 ) do
         block_number = [inodeEntry + 8 + cnt];
-        buffer_number =  block_number % 4;
-        buffer_entry = BUFFER_TABLE + buffer_number*4;
+        if (block_number != -1) then
+            buffer_number =  block_number % 4;
+            buffer_entry = BUFFER_TABLE + buffer_number*4;
 
-        //if disk block is loaded into buffer and DIRTY BIT is set, reset dirty bit. 
-        if([buffer_entry + 0] == block_number && [buffer_entry + 1] == 1) then
-            [buffer_entry + 1] = 0;
+            //if disk block is loaded into buffer and DIRTY BIT is set, reset dirty bit. 
+            if([buffer_entry + 0] == block_number && [buffer_entry + 1] == 1) then
+                [buffer_entry + 1] = 0;
+            endif;
+
+            // release disk block
+            // CALL RELEASE_BLOCK, MEMORY MANAGER 2
+            R1 = 4;
+            R2 = block_number;
+            R3 = [SYSTEM_STATUS_TABLE+1];
+            multipush(R5, R14, R6, R7, R8, R9, R10, R11, R13);
+            call MOD_2;
+            multipop(R5, R14, R6, R7, R8, R9, R10, R11, R13);
         endif;
-
-        // release disk block
-        // CALL RELEASE_BLOCK, MEMORY MANAGER 2
-        R1 = 4;
-        R2 = block_number;
-        R3 = [SYSTEM_STATUS_TABLE+1];
-        multipush(R5, R14, R6, R7, R8, R9, R10, R11, R13);
-        call MOD_2;
-        multipop(R5, R14, R6, R7, R8, R9, R10, R11, R13);
         cnt = cnt + 1;
     endwhile ;
 

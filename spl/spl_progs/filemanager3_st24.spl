@@ -144,7 +144,7 @@ if(functionNum == 3) then
     endwhile ;
 
     //no free entry
-    if(cnt == 60) then
+    if(cnt == 32) then
         // release lock on file
         // CALL RELEASE_INODE, RESOURCE MANAGER 0
         R1 = 5;

@@ -34,7 +34,6 @@ if(syscallNum == 2) then
 
     alias filename R7;
     filename = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
-    print filename;
     alias resourceTable R8;
     resourceTable = [processEntry + 11]*512 + RESOURCE_TABLE_OFFSET;
 
@@ -111,7 +110,7 @@ if(syscallNum == 3) then
     endif;  
 
     //if resource identifier field of table entry is not 0
-    if([resourceTable + 2*fileDesc] != 0) then
+    if([resourceTable + 2*fileDesc] != FILE) then
         [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
         goto end;
     endif;  
