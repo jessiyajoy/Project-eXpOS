@@ -31,7 +31,7 @@ if(functionNum == 2) then
     bufferEntry = BUFFER_TABLE + bufferNumber*4;
 
     // check if buffer contains a different disk block
-    if([bufferEntry] != -1 &&  [bufferEntry] != blockNo) then
+    if([bufferEntry] != blockNo) then
         if([bufferEntry + 1] == 1) then
             //disk_store() function in the device manager module
             R1 = 1;
@@ -43,16 +43,16 @@ if(functionNum == 2) then
             multipop(R5, R6, R7, R8, R9);
             [bufferEntry + 1] = 0;
         endif;
+        //disk_load() function in the device manager module
+        R1 = 2;
+        R2 = [SYSTEM_STATUS_TABLE+1];
+        R3 = BUFFER_BASE + bufferNumber;
+        R4 = blockNo;
+        multipush(R5, R6, R7, R8, R9);
+        call DEVICE_MANAGER;
+        multipop(R5, R6, R7, R8, R9);
     endif;
 
-    //disk_load() function in the device manager module
-    R1 = 2;
-    R2 = [SYSTEM_STATUS_TABLE+1];
-    R3 = BUFFER_BASE + bufferNumber;
-    R4 = blockNo;
-    multipush(R5, R6, R7, R8, R9);
-    call DEVICE_MANAGER;
-    multipop(R5, R6, R7, R8, R9);
 
     // new Disk block number in the Buffer table entry
     [bufferEntry] = blockNo;

@@ -11,6 +11,9 @@ begin
     a = 0;
     while(a != -2)  do
         a = exposcall("Read", fileDesc, word);
+        if (a == -2) then
+            break;
+        endif;
         tmp = exposcall("Write",-2,word);
     endwhile;
     return 0;
