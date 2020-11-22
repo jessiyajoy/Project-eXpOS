@@ -1,0 +1,24 @@
+int main()
+{
+    decl
+        int tmp, a, cnt, fileDesc;
+        string word;
+    enddecl
+    begin
+        fileDesc = exposcall("Open","root");
+        cnt = 0;
+        while(cnt < 60)  do
+            a = exposcall("Read", fileDesc, word);
+            //if word read is -1 skip printing it
+            if(word == "-1") then
+                tmp = exposcall("Seek",fileDesc,7);
+                cnt = cnt + 1;
+                continue;
+            endif;
+            tmp = exposcall("Write",-2,word);
+            tmp = exposcall("Seek",fileDesc,7);
+            cnt = cnt + 1;
+        endwhile;
+        return 0;
+    end
+}

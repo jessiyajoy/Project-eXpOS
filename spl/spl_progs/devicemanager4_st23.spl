@@ -12,7 +12,6 @@ alias currentPID R2;
 if( functionNum == 1 ) then
     alias pageNo R3;
     alias blockNo R4;
-
     //Call Acquire Disk function in resource manager module
     multipush(R2, R3, R4); 
     R1 = 3;

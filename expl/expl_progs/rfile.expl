@@ -16,6 +16,7 @@ begin
         endif;
         tmp = exposcall("Write",-2,word);
     endwhile;
+    tmp = exposcall("Close",fileDesc);
     return 0;
 end
 }

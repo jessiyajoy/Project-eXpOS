@@ -10,6 +10,7 @@ begin
     tmp = exposcall("Read", -1, permission);
 
     tmp = exposcall("Create", name, permission);
+    tmp = exposcall("Create", name, permission);
     return 0;
 end
 }

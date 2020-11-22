@@ -112,9 +112,9 @@ if( functionNum == 4 ) then
         [ PROCESS_TABLE + 16*currentPID + 4 ] = WAIT_FILE;
         [ PROCESS_TABLE + 16*currentPID + 5 ] = inodeIdx;
 
-        multipush(R0, R1, R2);
+        multipush(R0, R1, R2, R3);
         call SCHEDULER;
-        multipop(R0, R1, R2);
+        multipop(R0, R1, R2, R3);
 
     endwhile ;
     //print "bye";
@@ -283,3 +283,4 @@ if( functionNum == 9 ) then
     R0 = 0;
     return;
 endif;
+

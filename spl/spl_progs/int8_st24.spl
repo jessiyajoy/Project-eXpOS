@@ -187,7 +187,6 @@ physicalAddrRetVal = ([pPTBR + 2*((userSP-1)/512)] * 512) + ((userSP-1)%512);
 [physicalAddrRetVal] = chPID;
 physicalAddrRetVal = ([chPTBR + 2*((userSP-1)/512)] * 512) + ((userSP-1)%512);
 [physicalAddrRetVal] = 0;
-print "fork done";
 end:
 //switch stack, mode
 SP = userSP; 
