@@ -32,7 +32,6 @@ endif;
 if(newPID != currentPID) then
     [70*512 + 509] = [70*512 + 509]+1;
 endif;
-
 alias new_process_table R3;
 new_process_table = PROCESS_TABLE + newPID * 16;
 
@@ -50,7 +49,6 @@ if([new_process_table + 4] == CREATED) then
     [new_process_table + 9] = 0;
 	ireturn;
 endif;
-
 [new_process_table + 4] = RUNNING;
 multipop(BP);
 return;

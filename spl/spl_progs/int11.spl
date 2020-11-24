@@ -55,6 +55,7 @@ if(syscallNum == 13) then
 
     [PROCESS_TABLE + 16*[SYSTEM_STATUS_TABLE+1] + 4] = WAIT_PROCESS;
     [PROCESS_TABLE + 16*[SYSTEM_STATUS_TABLE+1] + 5] = wPID;
+    print "wait";print wPID;print[SYSTEM_STATUS_TABLE+1];
     call SCHEDULER;
 
     //The following step is executed only when the scheduler runs this process again

@@ -1,0 +1,20 @@
+int main()
+{
+    decl
+        int tmp, userid, username;
+    enddecl
+    begin
+        userid = 0;
+        while(userid < 16)  do
+            username = exposcall("Getuname", userid);
+            //if userid read is -1 skip printing it
+            if(username == -1) then
+                userid = userid + 1;
+                continue;
+            endif;
+            tmp = exposcall("Write",-2,username);
+            userid = userid + 1;
+        endwhile;
+        return 0;
+    end
+}

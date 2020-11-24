@@ -1,0 +1,67 @@
+// LOGOUT SYSTEM CALL (SYS CALL NO = 28)
+
+// Arguments: None
+// Return Value:
+//  -1 on error, otherwise does not return
+
+// can be invoked only from the shell process (PID = 2)
+// all running processes of the current user are terminated and all resources released
+// Idle and init/Login will be the only processes running after the execution of Logout
+// Login process is woken up at the end of logout.
+
+
+
+alias processEntry R5;
+processEntry = PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16;
+
+//system mode
+[processEntry + 9] = 28;
+
+//save user SP for further use
+alias userSP R6;
+userSP = SP;
+
+//save user stack ptr in prcoess table UPTR
+[processEntry + 13] = SP;
+
+//set SP to KPTR
+SP = [processEntry + 11]*512 - 1;
+
+// check if pid = 2 (Shell process has the PID 2), else return -1
+if ([SYSTEM_STATUS_TABLE+1] != 2) then
+    [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
+    goto end;
+endif;
+
+// Kill all user processes except the shell
+multipush(R5, R6);
+R1 = KILL_ALL;
+R2 = [SYSTEM_STATUS_TABLE + 1];
+call PROCESS_MANAGER;
+multipop(R5, R6);
+
+// Set the STATE of the current process(shell) in the process table to TERMINATED.
+[PROCESS_TABLE + SHELL_PROCESS*2 + 4] = TERMINATED;
+
+// Getting shell ready to run when the next user logs in
+// Obtain the entry point IP value from the header of the shell program
+// Place it in the beginning (logical addesss 4096) of the stack of the shell(current process)
+// Reset the USERSP field of the shell to 4096
+alias iP R7;
+iP = [([PTBR + 8]*512) + 1];
+[([PTBR + 2*(4096)/512]*512)] = iP;
+// or [[PTBR + 16]*512)] = iP;
+
+// Wake up the Login process by changing STATE in it's process table entry to READY.
+[PROCESS_TABLE + LOGIN_PROCESS*16 + 4] = READY;
+
+// In system status table, reset the CURRENT_USER_ID field back to 0 (kernel).
+[SYSTEM_STATUS_TABLE] = 0;
+
+call SCHEDULER;
+
+end : 
+SP = userSP;
+[processEntry + 9] = 0;
+ireturn;
+

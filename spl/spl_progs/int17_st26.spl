@@ -1,0 +1,92 @@
+// LOGIN SYSTEM CALL (SYS CALL NO = 27)
+
+// Arguments: User name, Password
+// Return Value:
+//  0	Success
+// -1	Invalid username or password
+// -2	Permission denied
+
+// can be executed only from the login process
+// It verifies the user
+// Upon successful login, a new user process (shell) with the userid of the user specified is created
+// Calling process goes to sleep till the exit of the newly created shell process
+
+
+
+alias processEntry R5;
+processEntry = PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16;
+
+//system mode
+[processEntry + 9] = 27;
+
+//save user SP for further use
+alias userSP R6;
+userSP = SP;
+
+//save user stack ptr in prcoess table UPTR
+[processEntry + 13] = SP;
+
+//set SP to KPTR
+SP = [processEntry + 11]*512 - 1;
+
+// check if pid = 1 (Login process has PID = 1), else return -2
+if ([SYSTEM_STATUS_TABLE+1] != 1) then
+    [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -2;
+    goto end;
+endif;
+
+alias username R7;
+username = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
+
+alias password R8;
+password = [([PTBR + 2*((userSP-3)/512)]*512) + ((userSP-3)%512)];
+
+// Get the User Table entry curresponding to the username
+alias userID R9;
+userID = 0;
+while( userID < MAX_USER_NUM ) do
+    if( [USER_TABLE + 2*userID ] == username ) then
+        break;
+    endif ;
+    userID = userID +1;
+endwhile ;
+
+// 	If an entry does not exist, return -1
+if (userID == 16) then
+    [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
+    goto end;
+endif;
+
+alias userTableEntry R10;
+userTableEntry = USER_TABLE + 2*userID;
+
+//encrypt password
+encrypt password;
+
+// If the encrypted input password does not match the ENCRYPTED PASSWORD field in the user table entry, return -1
+if(password != [userTableEntry+1]) then
+    [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
+    goto end;
+endif;
+
+// In the process table entry for the shell process, set STATE as CREATED and USERID as that of the user who is logging in
+[PROCESS_TABLE + SHELL_PROCESS*16 + 4] = CREATED;
+[PROCESS_TABLE + SHELL_PROCESS*16 + 3] = userID;
+
+// 	Set the state of the current process in it's process table entry as (WAIT_PROCESS, 2)
+// Login waits for shell to exit 
+[processEntry + 4] = WAIT_PROCESS;
+[processEntry + 5] = SHELL_PROCESS;
+
+// In system status table, set the CURRENT_USER_ID as that of the user who is logging in.
+[SYSTEM_STATUS_TABLE] = userID;
+
+multipush(R5, R6);
+call SCHEDULER;
+multipop(R5, R6);
+
+[([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = 0;
+end : 
+SP = userSP;
+[processEntry + 9] = 0;
+ireturn;

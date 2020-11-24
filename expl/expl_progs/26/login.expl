@@ -1,0 +1,29 @@
+int main(){
+    decl
+        int tmp, ret;
+        string input, username, password;
+    enddecl
+    begin
+                    tmp = exposcall("Write",-2, "uname");
+
+        while (1==1)do
+            tmp = exposcall("Write",-2, "Enter uname");
+            tmp = exposcall("Read", -1, username);
+            tmp = exposcall("Write",-2, "Enter pswd");
+            tmp = exposcall("Read", -1, password);
+
+            ret = exposcall("Login", username, password);
+
+            if (ret == -1) then
+                tmp = exposcall("Write",-2, "Invalid user");
+            endif;
+
+            if (ret == -2) then
+                tmp = exposcall("Write",-2, "No Permission");
+            endif;
+
+        endwhile;
+    
+    return 0;
+    end
+}

@@ -90,7 +90,7 @@ if(SysCallNum == 1) then
     [rootEntry + 1] = 0;          // file size
     [rootEntry + 2] = DATA;       // file type
     // User Name from USER TABLE
-    [rootEntry + 3] = [USER_TABLE + [processTableEntry + 3]];
+    [rootEntry + 3] = [USER_TABLE + [processTableEntry + 3]*2];
     [rootEntry + 4] = permissions; // permission
 
     //Return 0

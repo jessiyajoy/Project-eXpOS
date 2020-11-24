@@ -1,0 +1,80 @@
+// SHUTDOWN SYSTEM CALL
+// Arguments: None
+// Return Value: -1 on error or NIL
+
+// MODE
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 21;
+
+alias userSP R5;
+userSP = SP;
+//--Switch Stack
+//save user SP, set SP to KPTR
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP;
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1;
+
+//int15 to be invoked only from shell process of root user
+// current process is not shell (PID in the process table != 2) or 
+// current user is not root user (USERID in the process table != 1)
+
+if( [PROCESS_TABLE +16*[SYSTEM_STATUS_TABLE+1] + 1]!= 2 || [PROCESS_TABLE +16*[SYSTEM_STATUS_TABLE+1] + 3]!=1 ) then
+    [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
+    //switch stack, mode
+    SP = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13]; 
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
+    ireturn;
+endif;
+
+// Kill all user processes except the idle, login and the current process(shell) by calling the kill_all() function in the Process Manager module
+R1 = KILL_ALL;
+R2 = [SYSTEM_STATUS_TABLE+1];
+call PROCESS_MANAGER;
+
+// BUFFER_TABLE - BLOCK NUMBER, DIRTY BIT, LOCKING PID
+alias cnt R6;
+cnt = 0;
+while(cnt < 4) do
+    if([BUFFER_TABLE + cnt*4 + 1] == 1) then
+        print "buffer page";
+        print cnt;
+        print [BUFFER_TABLE + cnt*4 + 0];
+        //Commit changes to the disk by calling the disk_store() function in the Device Manager module.
+        R1 = 1;
+        R2 = [SYSTEM_STATUS_TABLE+1];
+        R3 = BUFFER_BASE + cnt;
+        R4 = [BUFFER_TABLE + cnt*4 + 0];
+        multipush(R5, R6, R7, R8, R9);
+        call DEVICE_MANAGER;
+        multipop(R5, R6, R7, R8, R9);
+    endif;
+
+	cnt = cnt + 1;
+endwhile;
+// commit changes made in memory copies of disk ds to disk
+// inode table (& user table)
+R1 = DISK_STORE;
+R2 = [SYSTEM_STATUS_TABLE+1];
+R3 = 59;
+R4 = 3;
+call DEVICE_MANAGER;
+
+R1 = DISK_STORE;
+R2 = [SYSTEM_STATUS_TABLE+1];
+R3 = 60;
+R4 = 4;
+call DEVICE_MANAGER;
+
+// root file
+R1 = DISK_STORE;
+R2 = [SYSTEM_STATUS_TABLE+1];
+R3 = 62;
+R4 = 5;
+call DEVICE_MANAGER;
+
+// disk free list
+R1 = DISK_STORE;
+R2 = [SYSTEM_STATUS_TABLE+1];
+R3 = 61;
+R4 = 2;
+call DEVICE_MANAGER;
+
+halt;
