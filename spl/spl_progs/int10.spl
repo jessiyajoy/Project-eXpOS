@@ -1,6 +1,3 @@
-//NUMBER OF SWITCHES TO KERNEL MODULE
-[70*512 + 511] = [70*512 + 511]+1;
-
 
 //Mode
 [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 10;
@@ -12,18 +9,10 @@ SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1;
 R4 = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9];
 R1 = 3;
 R2 = [SYSTEM_STATUS_TABLE + 1];
-print "EXIT PID";
-print [SYSTEM_STATUS_TABLE + 1];
+// print "EXIT PID";
+// print [SYSTEM_STATUS_TABLE + 1];
 call MOD_1;
 
-// print "DISK COUNT";
-// print [70*512 + 508];
-// print "CONTEXT";
-// print [70*512 + 509];
-// print "MAX MEMORY";
-// print [70*512 + 510];
-// print "KERNEL SWITCH";
-// print [70*512 + 511];
 call SCHEDULER;
 
 

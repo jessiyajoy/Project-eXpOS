@@ -1,0 +1,363 @@
+
+//library code
+loadi(63,13);
+loadi(64,14);
+
+//init code
+loadi(65,7);
+
+//shell code
+loadi(67,9);
+loadi(68,10);
+
+
+//DISK DATA STRUCTURES
+
+//inode table
+loadi(59,3);
+loadi(60,4);
+
+//disk free list
+loadi(61 ,2);
+
+//root file
+loadi(62, 5);
+
+
+//-----MODULES
+
+//module_0 Resource Manager
+loadi(40,53);
+loadi(41,54);
+
+//module_1 Process Manager
+loadi(42,55);
+loadi(43,56);
+
+//module_2 Memory Manager
+loadi(44,57);
+loadi(45,58);
+
+//module_3 File Manager
+loadi(46,59);
+loadi(47,60);
+
+//module_4 Device Manager
+loadi(48,61);
+loadi(49,62);
+
+//module_5 Scheduler
+loadi(50,63);
+loadi(51,64);
+
+//module_6 Pager Module
+loadi(52,65);
+loadi(53,66);
+
+
+//------INTERRUPTS
+
+//exception handler
+loadi(2, 15);
+loadi(3, 16);
+
+//timer interrupt
+loadi(4, 17);
+loadi(5, 18);
+
+//disk interrupt handler
+loadi(6,19);
+loadi(7,20);
+
+//console interrupt handler
+loadi(8,21);
+loadi(9,22);
+
+//interrupt 4
+loadi(10,23);
+loadi(11,24);
+
+//interrupt 5
+loadi(12,25);
+loadi(13,26);
+
+//interrupt 6
+loadi(14,27);
+loadi(15,28);
+
+//interrupt 7
+loadi(16,29);
+loadi(17,30);
+
+//interrupt 8
+loadi(18,31);
+loadi(19,32);
+
+//interrupt 9
+loadi(20,33);
+loadi(21,34);
+
+//interrupt 10
+loadi(22,35);
+loadi(23,36);
+
+//interrupt 11
+loadi(24,37);
+loadi(25,38);
+
+//interrupt 12
+loadi(26,39);
+loadi(27,40);
+
+//interrupt 13
+loadi(28,41);
+loadi(29,42);
+
+//interrupt 14
+loadi(30,43);
+loadi(31,44);
+
+//interrupt 15
+loadi(32,45);
+loadi(33,46);
+
+//interrupt 16
+loadi(34,47);
+loadi(35,48);
+
+//interrupt 17
+loadi(36,49);
+loadi(37,50);
+
+
+// ----- INIT PROCESS 
+
+// PAGE TABLE
+
+PTBR = PAGE_TABLE_BASE + 20;
+PTLR = 10;
+
+//Library
+[PTBR+0] = 63;
+[PTBR+1] = "0100";
+[PTBR+2] = 64;
+[PTBR+3] = "0100";
+
+//Heap
+[PTBR+4] = -1; //78
+[PTBR+5] = "0000";
+[PTBR+6] = -1; //79
+[PTBR+7] = "0000";
+
+//Code
+[PTBR+8] = 65;
+[PTBR+9] = "0100";
+[PTBR+10] = -1;
+[PTBR+11] = "0000";
+[PTBR+12] = -1;
+[PTBR+13] = "0000";
+[PTBR+14] = -1;
+[PTBR+15] = "0000";
+
+//Stack
+[PTBR+16] = 66; //76
+[PTBR+17] = "0110";
+[PTBR+18] = -1;
+[PTBR+19] = "0000";
+
+// PROCESS_TABLE
+alias processEntry R2;
+processEntry = PROCESS_TABLE + 16;
+
+//process id
+[processEntry + 1] = 1;
+
+//userid
+[processEntry + 3] = 1;
+
+//status
+[processEntry + 4] = CREATED;
+
+//user area page
+[processEntry + 11] = 77; //80
+
+//UPTR
+[processEntry + 13] = 8*512;
+
+//KPTR
+[processEntry + 12] = 0;
+
+//PTBR, PTLR
+[processEntry + 14] = PAGE_TABLE_BASE + 20;
+[processEntry + 15] = 10;
+
+//set entry point in user stack
+[66*512] = [65 * 512 + 1];
+
+
+
+// ----- SHELL PROCESS 
+
+// PAGE TABLE
+
+PTBR = PAGE_TABLE_BASE + 40;
+PTLR = 10;
+
+//Library
+[PTBR+0] = 63;
+[PTBR+1] = "0100";
+[PTBR+2] = 64;
+[PTBR+3] = "0100";
+
+//Heap
+[PTBR+4] = -1;
+[PTBR+5] = "0000";
+[PTBR+6] = -1;
+[PTBR+7] = "0000";
+
+//Code
+[PTBR+8] = 67;
+[PTBR+9] = "0100";
+[PTBR+10] = 68;
+[PTBR+11] = "0100";
+[PTBR+12] = -1;
+[PTBR+13] = "0000";
+[PTBR+14] = -1;
+[PTBR+15] = "0000";
+
+//Stack
+[PTBR+16] = 78;
+[PTBR+17] = "0110";
+[PTBR+18] = 79;
+[PTBR+19] = "0110";
+
+// PROCESS_TABLE
+processEntry = PROCESS_TABLE + 2*16;
+
+//process id
+[processEntry + 1] = 2;
+
+//ppid
+[processEntry + 2] = 1;
+
+//status
+[processEntry + 4] = TERMINATED;
+
+//user area page
+[processEntry + 11] = 80;
+
+//UPTR
+[processEntry + 13] = 8*512;
+
+//KPTR
+[processEntry + 12] = 0;
+
+//PTBR, PTLR
+[processEntry + 14] = PAGE_TABLE_BASE + 40;
+[processEntry + 15] = 10;
+
+//set entry point in user stack
+[78*512] = [67 * 512 + 1];
+
+alias var R0;
+
+//---DISK_MAP_TABLE --- SHELL
+//unused, heap, code, stack
+alias diskMapTable R1;
+diskMapTable = DISK_MAP_TABLE + 20;
+
+var = 0;
+while( var < 10 ) do
+    [ diskMapTable + var ] = -1;
+    var = var + 1;
+endwhile ;
+
+[ diskMapTable + 4 ] = 9;
+[ diskMapTable + 5 ] = 10;
+
+
+
+//STATE field of other process table entries to TERMINATED, TICK = 0
+var = 2;
+while( var < 16 ) do
+    [PROCESS_TABLE + 16*var + 4] = TERMINATED;
+    [PROCESS_TABLE + 16*var] = 0;
+    var = var + 1;
+endwhile ;
+
+//indicates terminal is free before scheduling first process
+[TERMINAL_STATUS_TABLE] = 0;
+
+//Initialize the memory free list
+var = 0;
+while(var <= 80) do
+	[MEMORY_FREE_LIST + var] = 1;
+	var = var + 1;
+endwhile;
+while(var <= 127) do
+    [MEMORY_FREE_LIST + var] = 0;
+	var = var + 1;
+endwhile;
+
+// SYSTEM_STATUS_TABLE Initialization
+
+//Set MEM_FREE_COUNT & WAIT_MEM_COUNT in system status table
+[SYSTEM_STATUS_TABLE + 2] = 45;
+[SYSTEM_STATUS_TABLE + 3] = 0;
+
+// SWAPPED_COUNT, PAGING_STATUS
+[SYSTEM_STATUS_TABLE + 4] = 0;
+[SYSTEM_STATUS_TABLE + 5] = 0;
+
+
+//DISK_STATUS _TABLE
+[DISK_STATUS_TABLE] = 0;
+
+
+var = 0;
+alias userAreaPage R1;
+userAreaPage = [PROCESS_TABLE + 16 + 11];
+while( var < 8 ) do
+    [userAreaPage*512 + 496 + var*2] = -1;
+    var = var + 1;
+endwhile ;
+
+
+//--- SEMAPHORE_TABLE
+var = 0;
+while(var < 32) do
+	[SEMAPHORE_TABLE + var*4] = -1;
+    [SEMAPHORE_TABLE + var*4 + 1] = 0;
+	var = var + 1;
+endwhile;
+
+
+//---- FILE_STATUS_TABLE - LOCKING PID, FILE OPEN COUNT
+var = 0;
+while(var < 60) do
+	[FILE_STATUS_TABLE + var*4 + 0] = -1;
+	[FILE_STATUS_TABLE + var*4 + 1] = -1;
+	var = var + 1;
+endwhile;
+
+
+
+//----- BUFFER_TABLE - BLOCK NUMBER, DIRTY BIT, LOCKING PID
+var = 0;
+while(var < 4) do
+	[BUFFER_TABLE + var*4 + 0] = -1;
+	[BUFFER_TABLE + var*4 + 2] = -1;
+    [BUFFER_TABLE + var*4 + 1] = 0;
+	var = var + 1;
+endwhile;
+
+
+//---- OPEN_FILE_TABLE - INODE INDEX, OPEN INSTANCE COUNT
+var = 0;
+while(var < 32) do
+	[OPEN_FILE_TABLE + var*4 + 0] = -1;
+	[OPEN_FILE_TABLE + var*4 + 1] = 0;
+	var = var + 1;
+endwhile;
+
+return;

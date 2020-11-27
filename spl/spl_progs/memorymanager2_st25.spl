@@ -16,19 +16,12 @@ if( functionNum == 1 ) then
     while( [SYSTEM_STATUS_TABLE + 2] == 0) do
         [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 4] = WAIT_MEM;
         //call module 5
-        multipush(R1);
         call SCHEDULER;
-        multipop(R1);
     endwhile ;
 
     //Decrement MEM_FREE_COUNT & WAIT_MEM_COUNT in system status table
     [SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] - 1;
     [SYSTEM_STATUS_TABLE + 3] = [SYSTEM_STATUS_TABLE + 3] - 1;
-
-    //max mem usage
-    if (128 - [SYSTEM_STATUS_TABLE + 2] > [70*512 + 510] ) then
-        [70*512 + 510] = 128 - [SYSTEM_STATUS_TABLE + 2];
-    endif;
 
     //Find a free page using memory free list
     alias pageIdx R2;
@@ -140,7 +133,7 @@ if( functionNum == 5 ) then
         cnt = 0;
         while(cnt < 4) do
             auxInfo = [pageTable + cnt*2 + 1 ];
-            if( [diskMapTable + 4 + cnt] == codeBlock && (auxInfo == "0100" || auxInfo == "1100") ) then
+            if( [diskMapTable + 4 + cnt] == codeBlock && [pageTable + cnt*2 ] != -1) then //(auxInfo == "0100" || auxInfo == "1100"
                 //Increment entry in the memory free list
                 pageNo = [pageTable + cnt*2 ];
                 [MEMORY_FREE_LIST + pageNo] = [MEMORY_FREE_LIST + pageNo] + 1; 
@@ -157,8 +150,8 @@ if( functionNum == 5 ) then
     //---code page is not in memory----has to be loaded from disk 
     //---Get Free Page function (memory manager) to allocate a new page.
     multipush(R1, R2);
-    R1 = 1;
-    call MOD_2;
+    R1 = GET_FREE_PAGE;
+    call MEMORY_MANAGER;
     multipop(R1, R2);
     
      //Calling Disk load function 2 in device manager module (module 4)
@@ -166,8 +159,8 @@ if( functionNum == 5 ) then
     R4 = codeBlock; 
     R3 = R0;
     R2 = [SYSTEM_STATUS_TABLE + 1];
-    R1 = 2;
-    call MOD_4; 
+    R1 = DISK_LOAD;
+    call DEVICE_MANAGER; 
     multipop(R0, R1, R2);
     R0 = R0;
     breakpoint;

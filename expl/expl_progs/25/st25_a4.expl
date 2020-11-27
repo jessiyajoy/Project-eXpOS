@@ -105,41 +105,41 @@ int main()
     begin
         pid1=exposcall("Fork");
         if(pid1!=0) then
-        pid2=exposcall("Fork");
-        if(pid2!=0) then
-            //Store the numbers into "temp1.dat"
-            x=store("temp1.dat", 1);
+            pid2=exposcall("Fork");
+            if(pid2!=0) then
+                //Store the numbers into "temp1.dat"
+                x=store("temp1.dat", 1);
 
-            x=exposcall("Wait", pid2);
+                x=exposcall("Wait", pid2);
+            else
+                //Store the numbers into "temp2.dat"
+                x=store("temp2.dat", 2);
+
+                x=exposcall("Exit");
+            endif;
+
+            //Merge "temp1.dat" and "temp2.dat" into "tempa.dat"
+            x=merge("tempa.dat", "temp1.dat", "temp2.dat");
+
+            x=exposcall("Wait", pid1);
         else
-            //Store the numbers into "temp2.dat"
-            x=store("temp2.dat", 2);
+            pid2=exposcall("Fork");
+            if(pid2!=0) then
+                //Store the numbers into "temp3.dat"
+                x=store("temp3.dat", 3);
+
+                x=exposcall("Wait", pid2);
+            else
+                //Store the numbers into "temp4.dat"
+                x=store("temp4.dat", 4);
+
+                x=exposcall("Exit");
+            endif;
+
+            //Merge "temp3.dat" and "temp4.dat" into "tempb.dat"
+            x=merge("tempb.dat", "temp3.dat", "temp4.dat");
 
             x=exposcall("Exit");
-        endif;
-
-        //Merge "temp1.dat" and "temp2.dat" into "tempa.dat"
-        x=merge("tempa.dat", "temp1.dat", "temp2.dat");
-
-        x=exposcall("Wait", pid1);
-        else
-        pid2=exposcall("Fork");
-        if(pid2!=0) then
-            //Store the numbers into "temp3.dat"
-            x=store("temp3.dat", 3);
-
-            x=exposcall("Wait", pid2);
-        else
-            //Store the numbers into "temp4.dat"
-            x=store("temp4.dat", 4);
-
-            x=exposcall("Exit");
-        endif;
-
-        //Merge "temp3.dat" and "temp4.dat" into "tempb.dat"
-        x=merge("tempb.dat", "temp3.dat", "temp4.dat");
-
-        x=exposcall("Exit");
         endif;
 
         //Merge "tempa.dat" and "tempb.dat" into "merge.dat"

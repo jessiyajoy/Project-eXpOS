@@ -1,6 +1,4 @@
-//NUMBER OF SWITCHES TO KERNEL MODULE
-[70*512 + 511] = [70*512 + 511]+1;
-
+//DISK INTERRUPT
 
 // entered while some other process is executing in user mode
 //switch to kernel stack of that process 

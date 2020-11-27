@@ -34,9 +34,7 @@ alias cnt R6;
 cnt = 0;
 while(cnt < 4) do
     if([BUFFER_TABLE + cnt*4 + 1] == 1) then
-        print "buffer page";
-        print cnt;
-        print [BUFFER_TABLE + cnt*4 + 0];
+        
         //Commit changes to the disk by calling the disk_store() function in the Device Manager module.
         R1 = 1;
         R2 = [SYSTEM_STATUS_TABLE+1];

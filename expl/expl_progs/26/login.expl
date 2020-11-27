@@ -4,8 +4,6 @@ int main(){
         string input, username, password;
     enddecl
     begin
-                    tmp = exposcall("Write",-2, "uname");
-
         while (1==1)do
             tmp = exposcall("Write",-2, "Enter uname");
             tmp = exposcall("Read", -1, username);

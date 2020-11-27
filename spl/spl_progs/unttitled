@@ -1,0 +1,175 @@
+// // READ SYSTEM CALL
+
+// // Arguments: File Descriptor(Integer) and a Buffer (a String/Integer variable) into which a word is to be read from the file
+// // Return Value:
+// // 0	Success
+// // -1	File Descriptor given is invalid
+// // -2	File pointer has reached the end of file
+
+
+
+
+// //mode
+// [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 7;
+
+// //save user SP for further use
+// alias userSP R5;
+// userSP = SP;
+
+// //save user stack ptr in prcoess table UPTR
+// [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP;
+
+// //set SP to KPTR
+// SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1;
+
+// alias fileDesc R6;
+// fileDesc = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
+
+// //if fileDescriptor is terminal(=-1) extract arg 2 from userSP - 3, print it, store 0(success) return value at userSP - 1
+
+// if (fileDesc == -1) then
+
+// 	alias wordAddress R7;
+// 	wordAddress = [[PTBR + 2 * ((userSP - 3) / 512)] * 512 + ((userSP - 3) % 512)];
+
+//     //invoke Terminal Read function of MOD_4
+//     R1 = TERMINAL_READ;
+//     R2 = [SYSTEM_STATUS_TABLE + 1];
+//     R3 = wordAddress;
+//     multipush(R7, R6, R5);
+//     call DEVICE_MANAGER;
+//     multipop(R7, R6, R5);
+
+// 	[([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = 0;
+//     goto end;
+
+
+// else
+//     //If file descriptor (not in range 0 to 7)  is invalid, return -1. 
+//     if (fileDesc < 0 || fileDesc > 7) then
+//         [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
+//         goto end;
+//     endif;
+
+//     alias wordAddress R7;
+//     wordAddress = [[PTBR + 2 * ((userSP - 3) / 512)] * 512 + ((userSP - 3) % 512)];
+
+//     alias resourceTableEntry R8;
+//     resourceTableEntry = [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512 + RESOURCE_TABLE_OFFSET + 2*fileDesc;
+
+//     // resource identifier field Resource Table entry is not file, return -1
+//     if( [resourceTableEntry] != FILE ) then
+//         [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
+//         goto end;
+//     endif ;
+
+//     // 	Get the index of the Open File Table entry from the Per Process Resource Table entry.
+//     alias openFileTableEntry R9;
+//     openFileTableEntry = OPEN_FILE_TABLE + 4*[resourceTableEntry + 1];
+
+//     // Get the index of the Inode Table entry from the Open File Table entry. 
+//     alias inodeIndex R10;
+//     inodeIndex = [openFileTableEntry];
+
+//     // lock file
+//     // CALL ACQUIRE_INODE, RESOURCE MANAGER 0
+//     R1 = ACQUIRE_INODE;
+//     R2 = inodeIndex;
+//     R3 = [SYSTEM_STATUS_TABLE+1];
+//     multipush(R5, R6, R7, R8, R9, R10);
+//     call RESOURCE_MANAGER;
+//     multipop(R5, R6, R7, R8, R9, R10);
+
+//     //locking fails
+//     if(R0 == -1) then
+//         [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
+//         goto end;
+//     endif;
+
+//     // Get the Lseek position from the Open File Table entry
+//     alias lseek R11;
+//     lseek = [openFileTableEntry + 2];
+
+//     // Get the physical address curresponding to the logical address of Memory Buffer address given as input.
+//     alias physicalAddrInput R12;
+//     physicalAddrInput = ([PTBR + 2 * (wordAddress / 512)] * 512) + (wordAddress % 512); 
+
+
+//     // If the File corresponds to Root file 
+//     if ([openFileTableEntry + 0 ] == INODE_ROOT) then
+
+//         // If the lseek value is equal to the root file size(480), release_inode() return -2.
+//         if(lseek == 480) then
+//             // release lock on file
+//             // CALL RELEASE_INODE, RESOURCE MANAGER 0
+//             R1 = RELEASE_INODE;
+//             R2 = inodeIndex;
+//             R3 = [SYSTEM_STATUS_TABLE+1];
+//             multipush(R5, R6, R7, R8, R9, R10, R11, R12);
+//             call RESOURCE_MANAGER;
+//             multipop(R5, R6, R7, R8, R9, R10, R11, R12);
+//             [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -2;
+//             goto end;
+//         endif;
+
+//         // Read from the word at lseek position in memory copy of root file to the translated memory address
+//         [physicalAddrInput] = [ROOT_FILE + lseek];
+
+//         // Increment the Lseek position in the Open File Table.  
+//         [openFileTableEntry + 2] = [openFileTableEntry + 2] + 1;
+//     else
+
+//         // If lseek position is same as the file size, release_inode() and return -2 (End of file reached )
+//         if(lseek == [INODE_TABLE +16*inodeIndex + 2 ]) then
+//             // release lock on file
+//             // CALL RELEASE_INODE, RESOURCE MANAGER 0
+//             R1 = RELEASE_INODE;
+//             R2 = inodeIndex;
+//             R3 = [SYSTEM_STATUS_TABLE+1];
+//             multipush(R5, R6, R7, R8, R9, R10, R11, R12);
+//             call RESOURCE_MANAGER;
+//             multipop(R5, R6, R7, R8, R9, R10, R11, R12);
+//             [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -2;
+//             goto end;
+//         endif;
+
+//         // Find the disk block number and the position in the block from which input is read
+//         alias blockNo R13;
+//         blockNo = [INODE_TABLE +16*inodeIndex + 8 + lseek/512 ];
+//         alias offset R14;
+//         offset = lseek%512;
+
+//         // Read the data from the File Buffer 
+//         //buffered_read() function in File Manager module
+//         R1 = BUFFERED_READ;
+//         R2 = blockNo;
+//         R3 = offset;
+//         R4 = physicalAddrInput;
+//         multipush(R5, R6, R7, R8, R9, R10, R11, R12, R13, R14);
+//         call FILE_MANAGER;
+//         multipop(R5, R6, R7, R8, R9, R10, R11, R12, R13, R14);
+
+//         // Increment the Lseek position in the Open File Table.
+//         [openFileTableEntry + 2] = [openFileTableEntry + 2] + 1;
+//     endif;
+
+//     // release lock on file
+//     // CALL RELEASE_INODE, RESOURCE MANAGER 0
+//     R1 = RELEASE_INODE;
+//     R2 = inodeIndex;
+//     R3 = [SYSTEM_STATUS_TABLE+1];
+//     multipush(R5);
+//     call RESOURCE_MANAGER;
+//     multipop(R5);
+
+//     [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = 0;
+//     goto end;
+// endif;
+
+
+
+
+// end : 
+// SP = userSP;
+// [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+// ireturn;

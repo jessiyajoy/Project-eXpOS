@@ -21,6 +21,9 @@ processEntry = PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16;
 [processEntry + 13] = SP;
 SP = [processEntry + 11] * 512 - 1;
 
+alias returnAddress R11;
+returnAddress = ([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512);
+
 
 
 
@@ -44,7 +47,7 @@ if(syscallNum == 22) then
 
     // If the current user is not root, or if the current process is not the shell, return -2.
     if ([SYSTEM_STATUS_TABLE] != 1 || [SYSTEM_STATUS_TABLE + 1] != 2) then
-        [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -2;
+        [returnAddress] = -2;
         goto end;
     endif;
 
@@ -58,7 +61,7 @@ if(syscallNum == 22) then
     cnt = 0;
     while( cnt < MAX_USER_NUM ) do
         if( [USER_TABLE + 2*cnt ] == username ) then
-            [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
+            [returnAddress] = -1;
             goto end;
         endif ;
         cnt = cnt +1;
@@ -75,7 +78,7 @@ if(syscallNum == 22) then
 
     // If no free entry is found, return -3
     if (cnt == 16) then
-        [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -3;
+        [returnAddress] = -3;
         goto end;
     endif;
 
@@ -85,7 +88,7 @@ if(syscallNum == 22) then
     [USER_TABLE + 2*cnt ] = username;
     [USER_TABLE + 2*cnt + 1 ] = password;
 
-    [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = 0;
+    [returnAddress] = 0;
     goto end;
 endif;
 
@@ -112,7 +115,7 @@ if(syscallNum == 23) then
 
     // If the current user is not root, or if the current process is not the shell, return -2
     if ([SYSTEM_STATUS_TABLE] != 1 || [SYSTEM_STATUS_TABLE + 1] != 2) then
-        [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -2;
+        [returnAddress] = -2;
         goto end;
     endif;
 
@@ -121,7 +124,7 @@ if(syscallNum == 23) then
 
     // If the user to be removed is the "root" or "kernel" return -2
     if(username == "root" || username == "kernel" ) then
-        [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -2;
+        [returnAddress] = -2;
         goto end;
     endif;
 
@@ -137,7 +140,7 @@ if(syscallNum == 23) then
 
     // If the entry is not found, return -1
     if (cnt == MAX_USER_NUM) then
-        [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
+        [returnAddress] = -1;
         goto end;
     endif;
 
@@ -158,7 +161,7 @@ if(syscallNum == 23) then
     [USER_TABLE + 2*userID ] = -1;
     [USER_TABLE + 2*userID + 1 ] = -1;
 
-    [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = 0;
+    [returnAddress] = 0;
     goto end;
 
 endif;
@@ -185,7 +188,7 @@ if(syscallNum == 24) then
 
     // If the current process is not the shell, return -1.
     if ([SYSTEM_STATUS_TABLE + 1] != 2) then
-        [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
+        [returnAddress] = -1;
         goto end;
     endif;
 
@@ -206,7 +209,7 @@ if(syscallNum == 24) then
 
     // If entry is not found, return -2.
     if (cnt == MAX_USER_NUM) then
-        [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -2;
+        [returnAddress] = -2;
         goto end;
     endif;
 
@@ -216,7 +219,7 @@ if(syscallNum == 24) then
     //if userid of the process is not equal to the userid of the user 
     // and if the current user is not root, Return -1 
     if( [processEntry+3] != userID) then
-        [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
+        [returnAddress] = -1;
         goto end;
     endif;
 
@@ -226,88 +229,88 @@ if(syscallNum == 24) then
     // Set the ENCRYPTED PASSWORD field in the user table entry
     [USER_TABLE + 2*userID + 1 ] = password;
 
-    [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = 0;
+    [returnAddress] = 0;
     goto end;
 endif;
 
 
 
 
-// //---GETUID SYSTEM CALL
+//---GETUID SYSTEM CALL
 
-// // Arguments: User name
-// // Return Value:
-// // -1 :	Invalid Username
-// // User Identifier :Success
+// Arguments: User name
+// Return Value:
+// -1 :	Invalid Username
+// User Identifier :Success
 
-// // returns the userid corresponding to the username
-// // userid of a user is the index of the user table entry of the user.
+// returns the userid corresponding to the username
+// userid of a user is the index of the user table entry of the user.
 
-// if(syscallNum == 26) then
+if(syscallNum == 26) then
 
-//     //system mode
-//     [processEntry + 9] = 26;
+    //system mode
+    [processEntry + 9] = 26;
 
-//     alias username R7;
-//     username = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
+    alias username R7;
+    username = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
 
-//     // Loop through the User Table:
-//     alias cnt R8;
-//     cnt = 0;
-//     while( cnt < MAX_USER_NUM ) do
-//         if( [USER_TABLE + 2*cnt ] == username ) then
-//             [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = cnt;
-//             goto end;
-//         endif ;
-//         cnt = cnt +1;
-//     endwhile ;
+    // Loop through the User Table:
+    alias cnt R8;
+    cnt = 0;
+    while( cnt < MAX_USER_NUM ) do
+        if( [USER_TABLE + 2*cnt ] == username ) then
+            [returnAddress] = cnt;
+            goto end;
+        endif ;
+        cnt = cnt +1;
+    endwhile ;
 
-//     [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
-//     goto end;
+    [returnAddress] = -1;
+    goto end;
 
-// endif;
-
-
+endif;
 
 
-// //---GETUNAME SYSTEM CALL
 
-// // Arguments: User ID
-// // Return Value:
-// // -1 : Invalid UserID
-// // User Name : Success
 
-// // returns the username corresponding to the userid
+//---GETUNAME SYSTEM CALL
 
-// if(syscallNum == 25) then
+// Arguments: User ID
+// Return Value:
+// -1 : Invalid UserID
+// User Name : Success
 
-//     //system mode
-//     [processEntry + 9] = 25;
+// returns the username corresponding to the userid
 
-//     alias userID R7;
-//     userID = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
+if(syscallNum == 25) then
 
-//     // UserID < 0 or UserID > 15 return -1
-//     if(userID > 15 || userID < 0) then
-//         [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
-//         goto end;
-//     endif;
+    //system mode
+    [processEntry + 9] = 25;
 
-//     //If the user table entry curresponding to the userid is invalid, return -1
-//     if([USER_TABLE + userID*2] == -1) then
-//         [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
-//         goto end;
-//     endif;
+    alias userID R7;
+    userID = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
 
-//     // Fetch the user name from the User Table
-//     alias username R8;
-//     username = [USER_TABLE + userID*2];
+    // UserID < 0 or UserID > 15 return -1
+    if(userID > 15 || userID < 0) then
+        [returnAddress] = -1;
+        goto end;
+    endif;
 
-//     // Return the username.
-//     [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = username;
-//     goto end;
+    //If the user table entry curresponding to the userid is invalid, return -1
+    if([USER_TABLE + userID*2] == -1) then
+        [returnAddress] = -1;
+        goto end;
+    endif;
 
-// endif;
+    // Fetch the user name from the User Table
+    alias username R8;
+    username = [USER_TABLE + userID*2];
+
+    // Return the username.
+    [returnAddress] = username;
+    goto end;
+
+endif;
 
 end : 
 SP = userSP;

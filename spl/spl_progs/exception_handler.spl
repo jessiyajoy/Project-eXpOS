@@ -1,10 +1,9 @@
-//NUMBER OF SWITCHES TO KERNEL MODULE
-[70*512 + 511] = [70*512 + 511]+1;
-
+// EXCEPTION HANDLER
 
 // ----- FINAL ------
 
-
+// print "pid";
+// print [SYSTEM_STATUS_TABLE+1];
 //Args : None , Return : None
 breakpoint;
 
@@ -64,12 +63,12 @@ else
 	else 
 		if(EPN==2 || EPN==3) then
 		// Get Free Page 
-			R1=1;
-			call MOD_2;
+			R1=GET_FREE_PAGE;
+			call MEMORY_MANAGER;
 			[ [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+14] + EPN*2]=R0;
 			[ [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+14] + EPN*2 +1]="1110";
-			R1=1;
-			call MOD_2;
+			R1=GET_FREE_PAGE;
+			call MEMORY_MANAGER;
 			[ [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+14] + EPN*2 + 2]=R0;
 			[ [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+14] + EPN*2 + 3]="1110";
 		endif;

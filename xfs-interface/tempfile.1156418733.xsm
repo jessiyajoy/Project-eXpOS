@@ -1,0 +1,70 @@
+// responsible for swapping in and out processes
+// 1 - SWAP_OUT
+// 2 - SWAP_IN
+alias functionNum R1;
+// SWAP_OUT
+// Invoked when the physical memory is critically low
+// chooses a process to swap out, and free it's memory by moving it to the disk
+// PID of the currently running process is passed as an argument
+// Called by the timer interrupt
+if (functionNum == 1) then
+    // Choose a process to swap out(other than the IDLE, Shell or INIT)
+    // Loop through the Process Table
+    // find a non-swapped process that is in the WAIT_PROCESS, WAIT_SEMAPHORE state or if not found
+    // find process with the highest TICK which is not running, terminated, allocated or swapped
+    alias cnt R5;
+    alias swapPID R6;
+    swapPID = -1;
+    cnt = 0;
+    while( cnt <16 ) do
+        if([PROCESS_TABLE + cnt*16 + 6] == 0 && [PROCESS_TABLE + cnt*16 + 4] == WAIT_PROCESS)then
+            swapPID = cnt;
+            goto continue1;
+        endif;
+        cnt = cnt + 1;
+    endwhile ;
+    cnt = 0;
+    while( cnt <16 ) do
+        if([PROCESS_TABLE + cnt*16 + 6] == 0 && [PROCESS_TABLE + cnt*16 + 4] == WAIT_SEMAPHORE)then
+            swapPID = cnt;
+            goto continue1;
+        endif;
+        cnt = cnt + 1;
+    endwhile ;
+    alias state R7;
+    alias maxTick R8;
+    maxTick = -1;
+    cnt = 0;
+    while( cnt <16 ) do
+        state = [PROCESS_TABLE + cnt*16 + 4];
+        if([PROCESS_TABLE + cnt*16 + 6] == 0 &&  state!=RUNNING && state!=TERMINATED && state!=ALLO
+CATED )then
+            if([PROCESS_TABLE + cnt*16 ] > maxTick) then
+                maxTick = [PROCESS_TABLE + cnt*16 ];
+                swapPID = cnt;
+            endif;
+        endif;
+        cnt = cnt + 1;
+    endwhile ;
+    continue1 : 
+    // If no such process exists, set the PAGING_STATUS back to 0 and return
+    if(swapPID == -1) then
+        [SYSTEM_STATUS_TABLE + 5] = 0;
+        return;
+    endif;
+    // Set the TICK field of the process table entry of the selected process to 0.
+    [PROCESS_TABLE + swapPID*16 ] = 0;
+    alias ptbr R9;
+    ptbr = PAGE_TABLE_BASE + swapPID*20;
+    // Call the release_page() and invalidate Page table entries   
+    cnt = 2;
+    while( cnt < 10 ) do
+        if(cnt >=4 && cnt <=7) then //code pages
+            goto releasePage;
+        endif;
+        if(cnt==2|| cnt==3) then //valid and non shared heap pages
+            if([ptbr+cnt*2] != -1 && [MEMORY_FREE_LIST + [ptbr+cnt*2]] == 1)then
+                // Get a free swap block by calling the get_swap_block() function in the Memory Man
+ager module
+                R1 = GET_SWAP_BLOCK;
+                multipush(R5, R6, R7, R8, R9);

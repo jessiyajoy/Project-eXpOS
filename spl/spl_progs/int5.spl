@@ -218,9 +218,9 @@ if(syscallNum == 6) then
         multipush(R5, R6);
         call RESOURCE_MANAGER;
         multipop(R5, R6);
-        print "offset -2";
-        print lseek;
-        print offset;
+        // print "offset -2";
+        // print lseek;
+        // print offset;
         [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -2;    
         goto end;        
     endif ;

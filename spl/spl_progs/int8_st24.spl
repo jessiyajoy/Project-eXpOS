@@ -178,7 +178,6 @@ endwhile ;
 //This value will be used to initialize the BP register of the child process by the scheduler when the child is scheduled for the first time.
 [[processEntryC + 11]*512] = BP;
 
-
 //---Store return value at userSP - 1
 //PARENT : Child PID
 //CHILD : 0
