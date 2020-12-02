@@ -3,3 +3,8 @@ load --exhandler ../spl/spl_progs/haltprog.xsm
 load --int=timer $HOME/myexpos/spl/spl_progs/timer_st9.xsm
 load --int=10 ../spl/spl_progs/haltprog.xsm
 load --int=7 ../spl/spl_progs/int7_st10.xsm
+
+load --exec ../expl/expl_progs/27/m_store.xsm
+load --exec ../expl/expl_progs/27/m_sort.xsm
+load --exec ../expl/expl_progs/27/m_merge.xsm
+load --exec ../expl/expl_progs/27/merge.xsm

@@ -1,318 +1,617 @@
-//---- SYSTEM CALLS :
+// //---- SYSTEM CALLS :
 
-//22. NEWUSR SYSTEM CALL
-//23. RMUSR SYSTEM CALL
-//24. SETPWD SYSTEM CALL
-//25. GETUID SYSTEM CALL
-//26. GETUNAME SYSTEM CALL
+// //22. NEWUSR SYSTEM CALL
+// //23. RMUSR SYSTEM CALL
+// //24. SETPWD SYSTEM CALL
+// //25. GETUID SYSTEM CALL
+// //26. GETUNAME SYSTEM CALL
 
 
-alias syscallNum R15;
-syscallNum = [([PTBR + 2 * ((SP - 5) / 512)] * 512) + ((SP - 5) % 512)];
+// alias syscallNum R15;
+// syscallNum = [([PTBR + 2 * ((SP - 5) / 512)] * 512) + ((SP - 5) % 512)];
 
-alias userSP R5;
+// alias userSP R5;
+// userSP = SP;
+
+// alias processEntry R6;
+// processEntry = PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16;
+
+// //--Switch Stack
+// //save user SP, set SP to KPTR
+// [processEntry + 13] = SP;
+// SP = [processEntry + 11] * 512 - 1;
+
+// alias returnAddress R11;
+// returnAddress = ([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512);
+
+
+
+
+// //---NEWUSR SYSTEM CALL
+
+// //Args - User name, Password
+// // Return Value:
+// //  0	Success
+// // -1	User already exists
+// // -2	Permission denied
+// // -3	Number of users has reached the system limit
+
+// // checks whether the user already exists
+// // If not, it creates a new user with the username and password specified
+// // can be executed only by the shell process of root user
+
+// if(syscallNum == 22) then
+
+//     //system mode
+//     [processEntry + 9] = 22;
+
+//     // If the current user is not root, or if the current process is not the shell, return -2.
+//     if ([SYSTEM_STATUS_TABLE] != 1 || [SYSTEM_STATUS_TABLE + 1] != 2) then
+//         [returnAddress] = -2;
+//         goto end;
+//     endif;
+
+//     alias username R7;
+//     username = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
+//     alias password R8;
+//     password = [([PTBR + 2*((userSP-3)/512)]*512) + ((userSP-3)%512)];
+
+//     // Loop through the User Table and exit returning -1 if an entry for the user already exists
+//     alias cnt R9;
+//     cnt = 0;
+//     while( cnt < MAX_USER_NUM ) do
+//         if( [USER_TABLE + 2*cnt ] == username ) then
+//             [returnAddress] = -1;
+//             goto end;
+//         endif ;
+//         cnt = cnt +1;
+//     endwhile ;
+
+//     // Find a free entry in the User Table
+//     cnt = 0;
+//     while( cnt < MAX_USER_NUM ) do
+//         if( [USER_TABLE + 2*cnt ] == -1 ) then
+//             break;
+//         endif ;
+//         cnt = cnt +1;
+//     endwhile ;
+
+//     // If no free entry is found, return -3
+//     if (cnt == 16) then
+//         [returnAddress] = -3;
+//         goto end;
+//     endif;
+
+//     encrypt password;
+
+//     // Set the USERNAME and ENCRYPTED PASSWORD fields of the User Table entry.
+//     [USER_TABLE + 2*cnt ] = username;
+//     [USER_TABLE + 2*cnt + 1 ] = password;
+
+//     [returnAddress] = 0;
+//     goto end;
+// endif;
+
+
+
+
+// //---RMUSR SYSTEM CALL
+
+// // Arguments: User name
+// // Return Value:
+// //  0	Success
+// // -1	User does not exist
+// // -2	Permission denied
+// // -3	Undeleted files exist for the user
+
+// // used to remove an existing user
+// // can be executed from the shell proces of the root user
+// // The root user and kernel cannot be removed.
+
+// if(syscallNum == 23) then
+
+//     //system mode
+//     [processEntry + 9] = 23;
+
+//     // If the current user is not root, or if the current process is not the shell, return -2
+//     if ([SYSTEM_STATUS_TABLE] != 1 || [SYSTEM_STATUS_TABLE + 1] != 2) then
+//         [returnAddress] = -2;
+//         goto end;
+//     endif;
+
+//     alias username R7;
+//     username = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
+
+//     // If the user to be removed is the "root" or "kernel" return -2
+//     if(username == "root" || username == "kernel" ) then
+//         [returnAddress] = -2;
+//         goto end;
+//     endif;
+
+//     // Loop through the User Table and find the entry curresponding to the user
+//     alias cnt R8;
+//     cnt = 0;
+//     while( cnt < MAX_USER_NUM ) do
+//         if( [USER_TABLE + 2*cnt ] == username ) then
+//             break;
+//         endif ;
+//         cnt = cnt +1;
+//     endwhile ;
+
+//     // If the entry is not found, return -1
+//     if (cnt == MAX_USER_NUM) then
+//         [returnAddress] = -1;
+//         goto end;
+//     endif;
+//     alias userID R9;
+//     userID = cnt;
+
+//     // Loop through the Root File and exit returning -3 if there are files of the user present on disk.
+//     cnt = 0;
+//     while( cnt < MAX_FILE_NUM ) do
+//         if([ROOT_FILE + 8*cnt ] != -1 && [ROOT_FILE + 8*cnt + 3 ] == username) then
+//             [returnAddress] = -3;
+//             goto end;
+//         endif;
+//         cnt = cnt +1;
+//     endwhile ;
+
+//     // Invalidate the entry by setting the USERNAME and ENCRYPTED PASSWORD fields to -1.
+//     [USER_TABLE + 2*userID ] = -1;
+//     [USER_TABLE + 2*userID + 1 ] = -1;
+
+//     [returnAddress] = 0;
+//     goto end;
+
+// endif;
+
+
+
+// //---SETPWD SYSTEM CALL
+
+// // Arguments: User name, Password
+// // Return Value:
+// // 0	Success
+// // -1	Unauthorised attempt to change password
+// // -2	The user does not exist
+
+// // change the password of an existing user
+// // This system call can be exected only from the shell process
+// // A user can set only his/her password
+// // Root user can set any user's password
+
+// if(syscallNum == 24) then
+
+//     //system mode
+//     [processEntry + 9] = 24;
+
+//     // If the current process is not the shell, return -1.
+//     if ([SYSTEM_STATUS_TABLE + 1] != 2) then
+//         [returnAddress] = -1;
+//         goto end;
+//     endif;
+
+//     alias username R7;
+//     username = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
+//     alias password R8;
+//     password = [([PTBR + 2*((userSP-3)/512)]*512) + ((userSP-3)%512)];
+
+//     // Loop through the User Table and finds the entry curresponding to the user name.
+//     alias cnt R9;
+//     cnt = 0;
+//     while( cnt < MAX_USER_NUM ) do
+//         if( [USER_TABLE + 2*cnt ] == username ) then
+//             break;
+//         endif ;
+//         cnt = cnt +1;
+//     endwhile ;
+
+//     // If entry is not found, return -2.
+//     if (cnt == MAX_USER_NUM) then
+//         [returnAddress] = -2;
+//         goto end;
+//     endif;
+
+//     alias userID R10;
+//     userID = cnt;
+
+//     //if userid of the process is not equal to the userid of the user 
+//     // and if the current user is not root, Return -1 
+//     if( [processEntry+3] != userID) then
+//         [returnAddress] = -1;
+//         goto end;
+//     endif;
+
+//     //Find the encrypted password by applying the ENCRYPT instruction on the input password.
+//     encrypt password;
+
+//     // Set the ENCRYPTED PASSWORD field in the user table entry
+//     [USER_TABLE + 2*userID + 1 ] = password;
+
+//     [returnAddress] = 0;
+//     goto end;
+// endif;
+
+
+
+
+// //---GETUID SYSTEM CALL
+
+// // Arguments: User name
+// // Return Value:
+// // -1 :	Invalid Username
+// // User Identifier :Success
+
+// // returns the userid corresponding to the username
+// // userid of a user is the index of the user table entry of the user.
+
+// if(syscallNum == 26) then
+
+//     //system mode
+//     [processEntry + 9] = 26;
+
+//     alias username R7;
+//     username = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
+
+//     // Loop through the User Table:
+//     alias cnt R8;
+//     cnt = 0;
+//     while( cnt < MAX_USER_NUM ) do
+//         if( [USER_TABLE + 2*cnt ] == username ) then
+//             [returnAddress] = cnt;
+//             goto end;
+//         endif ;
+//         cnt = cnt +1;
+//     endwhile ;
+
+//     [returnAddress] = -1;
+//     goto end;
+
+// endif;
+
+
+
+
+// //---GETUNAME SYSTEM CALL
+
+// // Arguments: User ID
+// // Return Value:
+// // -1 : Invalid UserID
+// // User Name : Success
+
+// // returns the username corresponding to the userid
+
+// if(syscallNum == 25) then
+
+//     //system mode
+//     [processEntry + 9] = 25;
+
+//     alias userID R7;
+//     userID = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
+
+//     // UserID < 0 or UserID > 15 return -1
+//     if(userID > 15 || userID < 0) then
+//         [returnAddress] = -1;
+//         goto end;
+//     endif;
+
+//     //If the user table entry curresponding to the userid is invalid, return -1
+//     if([USER_TABLE + userID*2] == -1) then
+//         [returnAddress] = -1;
+//         goto end;
+//     endif;
+
+//     // Fetch the user name from the User Table
+//     alias username R8;
+//     username = [USER_TABLE + userID*2];
+
+//     // Return the username.
+//     [returnAddress] = username;
+//     goto end;
+
+// endif;
+
+// end : 
+// SP = userSP;
+// [processEntry + 9] = 0;
+// ireturn;
+
+
+
+
+
+
+// --------- USER MANAGEMENT SYSCALLS ----------------------------------------------------------------------------------
+// SYSCALLS: 
+// Newusr(22), 
+// Remusr(23), 
+// Setpwd(24), 
+// Getuname(25) 
+// Getuid(26)
+
+//---- Extract Syscall Number from User stack (at userSP - 5)------------
+alias SysCallNum R1;
+alias userSP R2;
 userSP = SP;
+SysCallNum = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 5)/ 512] * 512 + ((userSP - 5) % 512)];
 
-alias processEntry R6;
-processEntry = PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16;
+//---- Switch Stack --------------------------------------------------------------------------------------------
+[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+13] = SP;
+SP = [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512-1;
 
-//--Switch Stack
-//save user SP, set SP to KPTR
-[processEntry + 13] = SP;
-SP = [processEntry + 11] * 512 - 1;
+alias physicalAddrRetVal R3;
+physicalAddrRetVal = ([PTBR + 2 * (userSP - 1)/ 512] * 512) + ((userSP - 1) % 512);
 
-alias returnAddress R11;
-returnAddress = ([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512);
+alias currPID R4;
+currPID = [SYSTEM_STATUS_TABLE + 1];
+
+alias processEntry R5;
+processEntry = PROCESS_TABLE + currPID * 16;
+
+//---- Get Args ------------------------------------
+alias arg1 R6;
+alias arg2 R7;
+arg1 = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+arg2 = [[PTBR + 2*((userSP-3)/512)]*512 + (userSP-3)%512];
 
 
+//---- Syscalls --------------------------------------------------------------------------------------------------------------
 
+//---- Newusr(22) ------------------------------------------------------------------------------------------
+// Arguments: 
+// 1. User name
+// 2. Password
+// Returns:
+// 0	:Success
+// -1	:User already exists
+// -2	:Permission denied
+// -3	:Number of users has reached the system limit.
 
-//---NEWUSR SYSTEM CALL
-
-//Args - User name, Password
-// Return Value:
-//  0	Success
-// -1	User already exists
-// -2	Permission denied
-// -3	Number of users has reached the system limit
-
-// checks whether the user already exists
-// If not, it creates a new user with the username and password specified
-// can be executed only by the shell process of root user
-
-if(syscallNum == 22) then
-
-    //system mode
+if( SysCallNum == 22) then
+    //---- Mode Flag -----------
     [processEntry + 9] = 22;
 
-    // If the current user is not root, or if the current process is not the shell, return -2.
-    if ([SYSTEM_STATUS_TABLE] != 1 || [SYSTEM_STATUS_TABLE + 1] != 2) then
-        [returnAddress] = -2;
+    //-- Name the Args ---------
+    alias username R6;
+    alias password R7;
+
+    //--- If Current User Not ROOT (userID = 1, CURRENT_USER_ID field) or Current Process is Not SHELL(PID = 2) -------------
+    if( [SYSTEM_STATUS_TABLE + 0] != 1  || currPID != 2 ) then
+        // return -2
+        [physicalAddrRetVal] = -2;
         goto end;
     endif;
 
-    alias username R7;
-    username = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
-    alias password R8;
-    password = [([PTBR + 2*((userSP-3)/512)]*512) + ((userSP-3)%512)];
-
-    // Loop through the User Table and exit returning -1 if an entry for the user already exists
-    alias cnt R9;
-    cnt = 0;
-    while( cnt < MAX_USER_NUM ) do
-        if( [USER_TABLE + 2*cnt ] == username ) then
-            [returnAddress] = -1;
+    //--- Check if the given User Already exists (return -1)-------------
+    alias i R8;
+    i = 0;		
+	while(i < MAX_USER_NUM)	do
+		if([USER_TABLE + i*2] == username) then
+            // return -1
+            [physicalAddrRetVal] = -1;
             goto end;
-        endif ;
-        cnt = cnt +1;
-    endwhile ;
+		endif;
+	i = i + 1;
+	endwhile;
 
-    // Find a free entry in the User Table
-    cnt = 0;
-    while( cnt < MAX_USER_NUM ) do
-        if( [USER_TABLE + 2*cnt ] == -1 ) then
-            break;
-        endif ;
-        cnt = cnt +1;
-    endwhile ;
-
-    // If no free entry is found, return -3
-    if (cnt == 16) then
-        [returnAddress] = -3;
+    //--- Find Free Entry in the USER TABLE -----------------------------
+    alias userid R8;
+    userid = 2;
+    while(userid < MAX_USER_NUM) do
+    if([USER_TABLE + 2*userid + 0] == -1) then
+        break;
+    endif;
+	userid = userid + 1;
+    endwhile;
+    // If no Free Entry in USER TABLE
+    if(userid == MAX_USER_NUM) then
+        // return -3
+        [physicalAddrRetVal] = -3;
         goto end;
     endif;
 
+    // Find Encrypted Password
     encrypt password;
 
-    // Set the USERNAME and ENCRYPTED PASSWORD fields of the User Table entry.
-    [USER_TABLE + 2*cnt ] = username;
-    [USER_TABLE + 2*cnt + 1 ] = password;
+    // -- Setting Up the USER TABLE ENTRY for New User ---------------------------
+    [USER_TABLE + 2*userid + 0] = username;
+	[USER_TABLE + 2*userid + 1] = password;
 
-    [returnAddress] = 0;
+    // Return 0, Success
+    [physicalAddrRetVal] = 0;
     goto end;
 endif;
 
-
-
-
-//---RMUSR SYSTEM CALL
-
+//---- Remusr(23) ------------------------------------------------------------------------------------------
 // Arguments: User name
-// Return Value:
-//  0	Success
-// -1	User does not exist
-// -2	Permission denied
-// -3	Undeleted files exist for the user
-
-// used to remove an existing user
-// can be executed from the shell proces of the root user
-// The root user and kernel cannot be removed.
-
-if(syscallNum == 23) then
-
-    //system mode
+// Returns:
+// 0	:Success
+// -1	:User does not exist
+// -2	:Permission denied
+// -3	:Undeleted files exist for the user
+if( SysCallNum == 23) then
+    //---- Mode Flag -----------
     [processEntry + 9] = 23;
 
-    // If the current user is not root, or if the current process is not the shell, return -2
-    if ([SYSTEM_STATUS_TABLE] != 1 || [SYSTEM_STATUS_TABLE + 1] != 2) then
-        [returnAddress] = -2;
+    //-- Name the Args ---------
+    alias username R6;
+
+    //--- If Current User Not ROOT (userID = 1, CURRENT_USER_ID field) or Current Process is Not SHELL(PID = 2) -------------
+    if( [SYSTEM_STATUS_TABLE + 0] != 1  || currPID != 2 ) then
+        // return -2
+        [physicalAddrRetVal] = -2;
         goto end;
     endif;
 
-    alias username R7;
-    username = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
-
-    // If the user to be removed is the "root" or "kernel" return -2
-    if(username == "root" || username == "kernel" ) then
-        [returnAddress] = -2;
+    //-- Cannot Remove ROOT or KERNEL Users ---------------------------------
+    if( username == "root"  ||  username == "kernel" ) then
+        // return -2
+        [physicalAddrRetVal] = -2;
         goto end;
     endif;
 
-    // Loop through the User Table and find the entry curresponding to the user
-    alias cnt R8;
-    cnt = 0;
-    while( cnt < MAX_USER_NUM ) do
-        if( [USER_TABLE + 2*cnt ] == username ) then
-            break;
-        endif ;
-        cnt = cnt +1;
-    endwhile ;
-
-    // If the entry is not found, return -1
-    if (cnt == MAX_USER_NUM) then
-        [returnAddress] = -1;
+    //-- Find the User Table Entry (UserID) -------------------------------------
+    alias userid R7;
+    userid = 0;
+    while(userid < MAX_USER_NUM) do
+		if([USER_TABLE + 2*userid] == username) then
+			break;
+		endif;
+	userid = userid + 1;
+	endwhile;
+    //-- If No Entry Found, return -1 -------
+    if(userid == MAX_USER_NUM) then
+        [physicalAddrRetVal] = -1;
         goto end;
     endif;
-    alias userID R9;
-    userID = cnt;
 
-    // Loop through the Root File and exit returning -3 if there are files of the user present on disk.
-    cnt = 0;
-    while( cnt < MAX_FILE_NUM ) do
-        if([ROOT_FILE + 8*cnt ] != -1 && [ROOT_FILE + 8*cnt + 3 ] == username) then
-            [returnAddress] = -3;
+    //-- Check if Undeleted files exist for the User -------------------------------------
+    // Cannot Remove User if Yes, return -3
+    // Loop Through the ROOT FILE (which has the username)
+    alias i R8;
+	i = 0;
+	while(i < MAX_FILE_NUM) do
+		if([ROOT_FILE + i*8 + 0] != -1  &&  [ROOT_FILE + i*8 + 3] == username) then
+            [physicalAddrRetVal] = -1;
             goto end;
-        endif;
-        cnt = cnt +1;
-    endwhile ;
+		endif;
+	    i = i + 1;
+	endwhile;
 
-    // Invalidate the entry by setting the USERNAME and ENCRYPTED PASSWORD fields to -1.
-    [USER_TABLE + 2*userID ] = -1;
-    [USER_TABLE + 2*userID + 1 ] = -1;
+    //-- Invalidate the USERTABLE entry for the User----------------------------------------------------
+	[USER_TABLE + 2*userid + 0] = -1;
+	[USER_TABLE + 2*userid + 1] = -1;
 
-    [returnAddress] = 0;
+    //-- Return 0, Success ----------------------------
+    [physicalAddrRetVal] = 0;
     goto end;
 
 endif;
 
-
-
-//---SETPWD SYSTEM CALL
-
-// Arguments: User name, Password
-// Return Value:
+//---- Setpwd(24) ------------------------------------------------------------------------------------------
+// Arguments: 
+// 1. User name
+// 2. Password
+// Returns:
 // 0	Success
 // -1	Unauthorised attempt to change password
 // -2	The user does not exist
 
-// change the password of an existing user
-// This system call can be exected only from the shell process
-// A user can set only his/her password
-// Root user can set any user's password
-
-if(syscallNum == 24) then
-
-    //system mode
+if( SysCallNum == 24) then
+    //---- Mode Flag -----------
     [processEntry + 9] = 24;
 
-    // If the current process is not the shell, return -1.
-    if ([SYSTEM_STATUS_TABLE + 1] != 2) then
-        [returnAddress] = -1;
+    //-- Name the Args ---------
+    alias username R6;
+    alias password R7;
+
+    //--- If Current Process is Not SHELL(PID = 2) -------------
+    if( currPID != 2 ) then
+        // return -1
+        [physicalAddrRetVal] = -1;
         goto end;
     endif;
 
-    alias username R7;
-    username = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
-    alias password R8;
-    password = [([PTBR + 2*((userSP-3)/512)]*512) + ((userSP-3)%512)];
-
-    // Loop through the User Table and finds the entry curresponding to the user name.
-    alias cnt R9;
-    cnt = 0;
-    while( cnt < MAX_USER_NUM ) do
-        if( [USER_TABLE + 2*cnt ] == username ) then
+    //-- Find the User Table Entry (UserID) -------------------------------------
+    alias userid R8;
+    userid = 0;
+    while(userid < MAX_USER_NUM) do
+        if([USER_TABLE + 2*userid] == username) then
             break;
-        endif ;
-        cnt = cnt +1;
-    endwhile ;
-
-    // If entry is not found, return -2.
-    if (cnt == MAX_USER_NUM) then
-        [returnAddress] = -2;
+        endif;
+    userid = userid + 1;
+    endwhile;
+    //-- If No Entry Found, return -2 -------
+    if(userid == MAX_USER_NUM) then
+        [physicalAddrRetVal] = -2;
         goto end;
     endif;
 
-    alias userID R10;
-    userID = cnt;
-
-    //if userid of the process is not equal to the userid of the user 
-    // and if the current user is not root, Return -1 
-    if( [processEntry+3] != userID) then
-        [returnAddress] = -1;
-        goto end;
-    endif;
-
-    //Find the encrypted password by applying the ENCRYPT instruction on the input password.
-    encrypt password;
-
-    // Set the ENCRYPTED PASSWORD field in the user table entry
-    [USER_TABLE + 2*userID + 1 ] = password;
-
-    [returnAddress] = 0;
-    goto end;
-endif;
-
-
-
-
-//---GETUID SYSTEM CALL
-
-// Arguments: User name
-// Return Value:
-// -1 :	Invalid Username
-// User Identifier :Success
-
-// returns the userid corresponding to the username
-// userid of a user is the index of the user table entry of the user.
-
-if(syscallNum == 26) then
-
-    //system mode
-    [processEntry + 9] = 26;
-
-    alias username R7;
-    username = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
-
-    // Loop through the User Table:
-    alias cnt R8;
-    cnt = 0;
-    while( cnt < MAX_USER_NUM ) do
-        if( [USER_TABLE + 2*cnt ] == username ) then
-            [returnAddress] = cnt;
+    // A user can set only his/her password. 
+    // Root user can set any user's password.
+    // if userid of process != userid given
+    if( [processEntry + 3] != userid ) then
+        if( [processEntry + 3] != 1 ) then
+            // if current user not ROOT
+            // return -1
+            [physicalAddrRetVal] = -1;
             goto end;
-        endif ;
-        cnt = cnt +1;
-    endwhile ;
+        endif;
+    endif;
 
-    [returnAddress] = -1;
+    // Encrypt the Password and Store the New Password
+    encrypt password;
+    [USER_TABLE + userid*2 + 1] = password;
+
+    // Return 0, Success
+    [physicalAddrRetVal] = 0;
     goto end;
 
 endif;
 
-
-
-
-//---GETUNAME SYSTEM CALL
-
+//---- Getuname(25) ------------------------------------------------------------------------------------------
 // Arguments: User ID
-// Return Value:
-// -1 : Invalid UserID
-// User Name : Success
-
-// returns the username corresponding to the userid
-
-if(syscallNum == 25) then
-
-    //system mode
+// Returns:
+// -1       : Invalid UserID
+// UserName	: Success
+if( SysCallNum == 25) then
+    //---- Mode Flag -----------
     [processEntry + 9] = 25;
 
-    alias userID R7;
-    userID = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
+    //-- Name the Args ---------
+    alias userid R6;
 
-    // UserID < 0 or UserID > 15 return -1
-    if(userID > 15 || userID < 0) then
-        [returnAddress] = -1;
+    //-- Validity of userid -------------
+    if( userid < 0 || userid > 15 ) then
+        // Invalid => return -1
+        [physicalAddrRetVal] = -1;
         goto end;
     endif;
 
-    //If the user table entry curresponding to the userid is invalid, return -1
-    if([USER_TABLE + userID*2] == -1) then
-        [returnAddress] = -1;
+    //-- Validity of USERT TABLE Entry -----------
+    if( [USER_TABLE + userid*2] == -1 ) then
+        // Invalid Entry => return -1
+        [physicalAddrRetVal] = -1;
         goto end;
     endif;
 
-    // Fetch the user name from the User Table
-    alias username R8;
-    username = [USER_TABLE + userID*2];
-
-    // Return the username.
-    [returnAddress] = username;
+    //-- Return the UserName from USER TABLE Entry -----------------------
+    [physicalAddrRetVal] = [USER_TABLE + userid*2];
     goto end;
 
 endif;
 
-end : 
-SP = userSP;
-[processEntry + 9] = 0;
-ireturn;
+//---- Getuid(26) ------------------------------------------------------------------------------------------
+// Arguments: UserName
+// Returns:
+// -1       : Invalid UserName
+// UserID	: Success
+if( SysCallNum == 26) then
+    //---- Mode Flag -----------
+    [processEntry + 9] = 26;
 
+    //-- Name the Args ---------
+    alias username R6;
+
+    //-- Get the UserID from UserTable ------------
+    alias userid R7;
+    userid = 0;
+    while(userid < MAX_USER_NUM) do
+        if([USER_TABLE + 2*userid] == username) then
+            [physicalAddrRetVal] = userid;
+            goto end;
+        endif;
+    userid = userid + 1;
+    endwhile;
+
+    //-- If No Entry Found, return -1 -------
+    [physicalAddrRetVal] = -1;
+    goto end;
+    
+endif;
+
+
+end:
+[processEntry + 9] = 0;
+SP = userSP;
+ireturn; 

@@ -1,67 +1,140 @@
-// LOGOUT SYSTEM CALL (SYS CALL NO = 28)
+// // LOGOUT SYSTEM CALL (SYS CALL NO = 28)
 
-// Arguments: None
-// Return Value:
-//  -1 on error, otherwise does not return
+// // Arguments: None
+// // Return Value:
+// //  -1 on error, otherwise does not return
 
-// can be invoked only from the shell process (PID = 2)
-// all running processes of the current user are terminated and all resources released
-// Idle and init/Login will be the only processes running after the execution of Logout
-// Login process is woken up at the end of logout.
+// // can be invoked only from the shell process (PID = 2)
+// // all running processes of the current user are terminated and all resources released
+// // Idle and init/Login will be the only processes running after the execution of Logout
+// // Login process is woken up at the end of logout.
 
 
 
-alias processEntry R5;
-processEntry = PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16;
+// alias processEntry R5;
+// processEntry = PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16;
 
-//system mode
-[processEntry + 9] = 28;
+// //system mode
+// [processEntry + 9] = 28;
 
-//save user SP for further use
-alias userSP R6;
+// //save user SP for further use
+// alias userSP R6;
+// userSP = SP;
+
+// //save user stack ptr in prcoess table UPTR
+// [processEntry + 13] = SP;
+
+// //set SP to KPTR
+// SP = [processEntry + 11]*512 - 1;
+
+// // check if pid = 2 (Shell process has the PID 2), else return -1
+// if ([SYSTEM_STATUS_TABLE+1] != 2) then
+//     [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
+//     goto end;
+// endif;
+
+// // Kill all user processes except the shell
+// multipush(R5, R6);
+// R1 = KILL_ALL;
+// R2 = [SYSTEM_STATUS_TABLE + 1];
+// call PROCESS_MANAGER;
+// multipop(R5, R6);
+
+// // Set the STATE of the current process(shell) in the process table to TERMINATED.
+// [PROCESS_TABLE + SHELL_PROCESS*2 + 4] = TERMINATED;
+
+// // Getting shell ready to run when the next user logs in
+// // Obtain the entry point IP value from the header of the shell program
+// // Place it in the beginning (logical addesss 4096) of the stack of the shell(current process)
+// // Reset the USERSP field of the shell to 4096
+// alias iP R7;
+// iP = [([PTBR + 8]*512) + 1];
+// [([PTBR + 2*(4096)/512]*512)] = iP;
+// // or [[PTBR + 16]*512)] = iP;
+
+// // Wake up the Login process by changing STATE in it's process table entry to READY.
+// [PROCESS_TABLE + LOGIN_PROCESS*16 + 4] = READY;
+
+// // In system status table, reset the CURRENT_USER_ID field back to 0 (kernel).
+// [SYSTEM_STATUS_TABLE] = 0;
+
+// call SCHEDULER;
+
+// end : 
+// SP = userSP;
+// [processEntry + 9] = 0;
+// ireturn;
+
+
+
+
+
+// ------------- LOGOUT SYSCALL ------------------------------------------------------------------------------
+// Arguments: 
+// None
+// Returns:
+// -1 on error, otherwise does not return anything
+
+//---------- Set the Mode Flag for LOGOUT = 28 ------------------------------ 
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 28;
+
+// Store UserSp in a Variable
+alias userSP R2;
 userSP = SP;
 
-//save user stack ptr in prcoess table UPTR
-[processEntry + 13] = SP;
+//------------- Switch Stacks ----------------------------------------------------
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13] = SP;
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1]) * 16 + 11] * 512 -1;
 
-//set SP to KPTR
-SP = [processEntry + 11]*512 - 1;
+alias currPID R4;
+currPID = [SYSTEM_STATUS_TABLE + 1];
 
-// check if pid = 2 (Shell process has the PID 2), else return -1
-if ([SYSTEM_STATUS_TABLE+1] != 2) then
-    [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
-    goto end;
+alias physicalAddrRetVal R3;
+physicalAddrRetVal = ([PTBR + 2 * (userSP - 1)/ 512] * 512) + ((userSP - 1) % 512);
+
+alias processEntry R5;
+processEntry = PROCESS_TABLE + currPID * 16;
+
+//--- If Current Process is NOT the Shell Process, return -1 ---------------------
+// Logout System Call can only be executed from the shell process (PID = 2)
+if(currPID != 2) then
+    // return -1
+    [physicalAddrRetVal] = -1;
+    [processEntry + 9] = 0;
+    SP = userSP;
+    ireturn;
 endif;
 
-// Kill all user processes except the shell
-multipush(R5, R6);
-R1 = KILL_ALL;
-R2 = [SYSTEM_STATUS_TABLE + 1];
-call PROCESS_MANAGER;
-multipop(R5, R6);
+// -- Kill all the processes except the current process(SHELL), idle and init/login. ---------
+// by calling KILL_ALL() in Process Manager
+multipush(R2,R3,R4,R5);
+	R1 = KILL_ALL;
+    R2 = currPID;	
+	call MOD_1;
+multipop(R2,R3,R4,R5);
 
-// Set the STATE of the current process(shell) in the process table to TERMINATED.
-[PROCESS_TABLE + SHELL_PROCESS*2 + 4] = TERMINATED;
+// -- Current Process (i.e. Shell Process) is set to TERMINATED state -------------
+[processEntry + 4] = TERMINATED;
 
-// Getting shell ready to run when the next user logs in
-// Obtain the entry point IP value from the header of the shell program
-// Place it in the beginning (logical addesss 4096) of the stack of the shell(current process)
-// Reset the USERSP field of the shell to 4096
-alias iP R7;
-iP = [([PTBR + 8]*512) + 1];
-[([PTBR + 2*(4096)/512]*512)] = iP;
-// or [[PTBR + 16]*512)] = iP;
+// ----- IMPORTANT STEPS ----------------------------------------------------------
+//* Shell should be set to READY ONLY when the next user logs in. *//
+// Get Entry IP Value from the Header (of Code Section) of Shell Program
+// Place it in the beginning (logical page 8) of the stack of the shell
+// SHELL PID = 2
+[[PTBR + 2*8]*512 + 0] = [[PTBR + 2*4]*512 + 1];
 
-// Wake up the Login process by changing STATE in it's process table entry to READY.
-[PROCESS_TABLE + LOGIN_PROCESS*16 + 4] = READY;
+// Reset the USERSP of the shell to 4096.
+[processEntry + 13] = 4096;
 
-// In system status table, reset the CURRENT_USER_ID field back to 0 (kernel).
-[SYSTEM_STATUS_TABLE] = 0;
 
-call SCHEDULER;
+// -- Wake up the Login process, STATE changed to READY -----------------------------------
+// Login Process PID = 1
+[PROCESS_TABLE + 16*1 + 4] = READY;
 
-end : 
-SP = userSP;
-[processEntry + 9] = 0;
-ireturn;
+// -- RESET the CURRENT_USER_ID field in the System Status Table to 0 (KERNEL) -----------------------
+[SYSTEM_STATUS_TABLE + 0] = 0;
 
+multipush(R2,R3,R4,R5,R6,R7,R8);
+    call SCHEDULER;
+multipop(R2,R3,R4,R5,R6,R7,R8);
+// DONE, Will not Return Back Here, Unless Again Invoked (Now TERMINATED State)
