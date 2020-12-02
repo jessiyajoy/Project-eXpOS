@@ -1,92 +1,164 @@
-// EXCEPTION HANDLER
+// // EXCEPTION HANDLER
 
-// ----- FINAL ------
+// // ----- FINAL ------
 
-// print "pid";
-// print [SYSTEM_STATUS_TABLE+1];
-//Args : None , Return : None
-breakpoint;
+// // print "ECXP pid";
+// // print [SYSTEM_STATUS_TABLE+1];
+// // print "EC"; print EC;
+// // print "epn";print EPN;
+// //Args : None , Return : None
+// breakpoint;
 
-//Mode
-[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 9] = -1;
+// //Mode
+// [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 9] = -1;
 
-//store user SP
-[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP;
-alias userSP R8;
-userSP = SP;
+// //store user SP
+// [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP;
+// alias userSP R8;
+// userSP = SP;
 
-// Setting SP to UArea Page number * 512 - 1
-SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1;
+// // Setting SP to UArea Page number * 512 - 1
+// SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1;
 
+// backup;
+
+// //Push EIP to kernel stack, later to be pushed to user stack
+// // to transfer control to exception instruction(ie reexceute it) 
+// multipush(EIP);
+
+
+// // ----- Exception cause not Page Fault ----
+// //OR check if UserStack is full (not overflowed yet but no space to store return address- EIP )
+// if(EC!=0 || userSP == PTLR*512-1 ) then
+// 	print "EXCEPTION";
+//     // print("EIP");
+// 	// print(EIP);
+// 	print("EC");
+// 	print(EC);
+// 	// print("EPN");
+// 	// print(EPN);
+// 	// print("EMA");
+// 	// print(EMA);	
+
+// 	// ----Exit Process
+// 	R1=3; 
+// 	R2=[SYSTEM_STATUS_TABLE+1];
+// 	print R2;
+// 	call MOD_1;
+
+//     // ---SCHEDULER
+// 	call MOD_5;
+
+// else	
+// // ----- Page Fault ------
+
+//     //----- CODE PAGE ----
+// 	if(EPN==4 || EPN==5 || EPN==6 || EPN==7 ) then
+// 		// Get Code Page
+// 		R1=GET_CODE_PAGE;
+// 		R2=[DISK_MAP_TABLE+[SYSTEM_STATUS_TABLE+1]*10+EPN];
+//         // print "r2";print[SYSTEM_STATUS_TABLE+1];
+//         // print DISK_MAP_TABLE+[SYSTEM_STATUS_TABLE+1]*10;
+//         // print R2;
+// 		call MEMORY_MANAGER;
+// 		[ PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE+1]*20 + EPN*2 ]=R0;
+// 		[ PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE+1]*20 + EPN*2 +1]="1100";
+
+//     //----- HEAP PAGE ----
+// 	else 
+// 		if(EPN==2 || EPN==3) then
+// 		// Get Free Page 
+// 			R1=GET_FREE_PAGE;
+// 			call MEMORY_MANAGER;
+// 			[ [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+14] + EPN*2]=R0;
+// 			[ [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+14] + EPN*2 +1]="1110";
+// 			R1=GET_FREE_PAGE;
+// 			call MEMORY_MANAGER;
+// 			[ [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+14] + EPN*2 + 2]=R0;
+// 			[ [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+14] + EPN*2 + 3]="1110";
+// 		endif;
+// 	endif;
+// endif;
+
+
+// //Mode
+// [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+9]=0; 
+
+// multipop(EIP);
+// restore;
+
+//  //Switch back to user stack
+// SP=[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+13];
+
+// //store EIP value onto user stack (adress translation needed)
+// [[[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 14] + 2*(SP/512) ]*512 + (SP%512)] = EIP;
+// SP=SP+1;
+
+// ireturn;
+
+
+// -------- EXCEPTION HANDLER ----------------------------------------------------------------------------------------------- //
+// ------ Switch Stack and Mode (EXCEPTION HANDLER) -------------------
+[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+9]=-1; 
+[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+13]=SP;
+SP=[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512-1;
 backup;
+multipush (EIP);
 
-//Push EIP to kernel stack, later to be pushed to user stack
-// to transfer control to exception instruction(ie reexceute it) 
-multipush(EIP);
-
-
-// ----- Exception cause not Page Fault ----
-//OR check if UserStack is full (not overflowed yet but no space to store return address- EIP )
-if(EC!=0 || userSP == PTLR*512-1 ) then
-	print "EXCEPTION";
-    print("EIP");
-	print(EIP);
-	print("EC");
+// ----- EXCEPTION Other Than Page Fault (or User Stack is full(Return adrress cannot be pushed))------------------------------
+if(EC!=0 || [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+13] >= ( [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+15]*512-1 )) then
+	print "----------";
+	print("EC:");
 	print(EC);
-	print("EPN");
+	print("EIP:");
+	print(EIP);
+	print("EPN:");
 	print(EPN);
-	print("EMA");
+	print("EMA:");
 	print(EMA);	
-
-	// ----Exit Process
+	print "----------";
+	// -------- Exit Process Called ----------
 	R1=3; 
 	R2=[SYSTEM_STATUS_TABLE+1];
 	print R2;
 	call MOD_1;
-
-    // ---SCHEDULER
 	call MOD_5;
-
 else	
-// ----- Page Fault ------
-
-    //----- CODE PAGE ----
+// ----- EXCEPTION : Page Fault ------------------------------
+	// print("------------");
+	// print("Page Fault:");
 	if(EPN==4 || EPN==5 || EPN==6 || EPN==7 ) then
-		// Get Code Page
+		// print("Code Page");
+		// print("------------");
+		// ----- Code Page (Calling Get Code Page) -------
 		R1=5;
 		R2=[DISK_MAP_TABLE+[SYSTEM_STATUS_TABLE+1]*10+EPN];
 		call MOD_2;
 		[ PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE+1]*20 + EPN*2 ]=R0;
 		[ PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE+1]*20 + EPN*2 +1]="1100";
-
-    //----- HEAP PAGE ----
 	else 
 		if(EPN==2 || EPN==3) then
-		// Get Free Page 
-			R1=GET_FREE_PAGE;
-			call MEMORY_MANAGER;
+			// print("Heap Page");
+			// print("------------");
+		// ----- Heap Page (Calling Get Free Page) --------
+			R1=1;
+			call MOD_2;
 			[ [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+14] + EPN*2]=R0;
 			[ [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+14] + EPN*2 +1]="1110";
-			R1=GET_FREE_PAGE;
-			call MEMORY_MANAGER;
+			R1=1;
+			call MOD_2;
 			[ [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+14] + EPN*2 + 2]=R0;
 			[ [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+14] + EPN*2 + 3]="1110";
 		endif;
 	endif;
 endif;
-
 [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+9]=0; 
-
-//Mode
-[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+9]=0; 
-
 multipop(EIP);
 restore;
-
- //Switch back to user stack
 SP=[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+13];
 
-//store EIP value onto user stack (adress translation needed)
 SP=SP+1;
-[[[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 14] + 2*(SP/512) ]*512 + (SP%512)] = EIP;
+// Address Transaltion on the SP to find the stack address to which EIP is to be stored
+[[[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16+14] + 2*(SP/512) ]*512 + (SP%512)] = EIP;
 ireturn;
+

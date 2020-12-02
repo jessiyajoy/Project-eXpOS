@@ -1,25 +1,281 @@
+// alias functionNum R1;
+// //Functions : GET_PCB_ENTRY(1), FREE_USER_AREA_PAGE(2), EXIT_PROCESS(3), FREE_PAGE_TABLE(4), KILL_ALL(5)
+// alias PID R2;
+
+// //--FINAL
+// //GET_PCB_ENTRY = 1------ Args - NIL, Return Index of Free PCB.
+// // Returns a Free PCB index. Returns -1 if PCB is full
+// // Called by Fork system call
+
+// if(functionNum == 1) then
+//     alias cnt R10;
+//     // Loop the process table to find free space and if found, set it up
+//     cnt = 0;
+//     while( cnt < 16 ) do
+//         if([PROCESS_TABLE + cnt*16 + 4] == TERMINATED) then
+//             // Set PID to index
+//             [PROCESS_TABLE + cnt*16 + 1] = cnt;
+//             // Set State
+//             [PROCESS_TABLE + cnt*16 + 4] = ALLOCATED;
+//             // Set PTBR and PTLR fields
+//             [PROCESS_TABLE + cnt*16 + 14] = PAGE_TABLE_BASE + cnt*20;
+//             [PROCESS_TABLE + cnt*16 + 15] = 10;
+//             R0 = cnt;
+//             return;
+//         endif;
+//         cnt = cnt + 1;
+//     endwhile;
+//     R0 = -1;
+//     return;
+// endif;
+
+// //--FINAL
+// //FREE_USER_AREA_PAGE = 2 ------ Args - PID, Return NIL
+// // Frees all the resources in the Resource Table inside the User Area page. Also frees the User Area page
+// // Note : The function should be called only when no file/buffer/terminal resource is locked by the process.
+// // Called by the exit_process function
+
+// if( functionNum == 2 ) then
+//     alias currentPID R7;
+//     R7 = R2;
+
+//     alias resourceTable R5;
+//     resourceTable = [PROCESS_TABLE+currentPID*16+11]*512 + 496;
+
+//     alias cnt R6;
+//     cnt = 0;
+//     while( cnt < 8 ) do
+//         if( [resourceTable + 2*cnt] == 1 ) then
+//             R1 = 7;
+//             R2 = [resourceTable + 2*cnt + 1];
+//             R3 = currentPID;
+//             multipush(R5, R6, R7);
+//             call RESOURCE_MANAGER;
+//             multipop(R5, R6, R7);  
+//         endif;
+//         if( [resourceTable + 2*cnt] == 0 ) then
+//             R1 = 4;
+//             R2 = [resourceTable + 2*cnt + 1];
+//             multipush(R5, R6, R7);
+//             call FILE_MANAGER;
+//             multipop(R5, R6, R7);    
+//         endif ;
+//         cnt = cnt + 1;
+//     endwhile;
+
+//     //invoke Release Page function of Memory Manager Mod 2 
+//     multipush(R2);
+//     R1 = 2;
+//     R2 = [PROCESS_TABLE + currentPID* 16 + 11];
+//     call MOD_2;
+//     multipop(R2);
+
+
+//     return;
+// endif;
+
+
+
+// //---FINAL
+// //EXIT_PROCESS = 3 ------ Args - PID, Return NIL
+// // Terminate the process whose PID is provided
+// // Note : The function should be called only when no file/terminal/disk/buffer resource is locked by the process.
+// // Called by exec system call, exit system call, exception handler, shutdown and logout
+
+// if( functionNum == 3 ) then
+//     alias currentPID R2;
+
+//     //invoke FREE_USER_AREA_PAGE function of Process Manager mod 1    
+//     multipush(R2);
+//     R1 = 2;
+//     R2 = currentPID;
+//     call MOD_1;
+//     multipop(R2);
+
+//     //invoke FREE_PAGE_TABLE function of Process Manager mod 1    
+//     multipush(R2);
+//     R1 = 4;
+//     R2 = currentPID;
+//     call MOD_1;
+//     multipop(R2);
+
+//     //Set state as TERMINATED
+//     [PROCESS_TABLE + currentPID* 16 + 4] = TERMINATED;
+
+//     //If MODE FLAG field not equal to 9 (Exec)
+//     //Loop through the process table of all processes
+//     //change the state to READY for the processes whose state is tuple (WAIT_PROCESS, current PID)
+//     //if PPID of a process is PID of current process, invalidate PPID field to -1.
+
+//     if( [PROCESS_TABLE + currentPID*16 + 9] != 9 ) then
+//         alias cnt R15;
+//         cnt = 0;
+//         while( cnt < 16 ) do
+//             if( [PROCESS_TABLE + 16*cnt + 4] == WAIT_PROCESS &&  [PROCESS_TABLE + 16*cnt + 5] == currentPID) then
+//                 [PROCESS_TABLE + 16*cnt + 4] = READY;
+//             endif ;
+//             if([PROCESS_TABLE + 16*cnt + 2] == currentPID) then
+//                 [PROCESS_TABLE + 16*cnt + 2] = -1;
+//             endif ;
+//             cnt = cnt + 1;
+//         endwhile;
+//     endif ;
+//     return;
+// endif;
+
+
+
+// //---FINAL---
+// //--FREE_PAGE_TABLE = 4 ------ Args - PID, Return NIL
+// // Free the page table entry and the used pages. The Disk Map table entries are also freed.
+// // Called by the exit_process function
+
+// if( functionNum == 4 ) then
+//     alias currentPID R2;
+    
+//     PTBR = PAGE_TABLE_BASE + 20*currentPID;
+//     PTLR = 10;
+
+//     // Library
+//     [PTBR + 0] = -1;
+// 	[PTBR + 1] = "0000";
+// 	[PTBR + 2] = -1;
+// 	[PTBR + 3] = "0000";
+//     alias cnt R3;
+//     cnt = 2;
+//     while( cnt < 10 ) do
+//         if([PTBR + cnt*2] != -1) then
+
+//             //invoke Release Page function of Memory Manager Mod 2 
+//             multipush(R2, R3);
+//             R1 = 2;
+//             R2 = [PTBR + cnt*2];
+//             call MOD_2;
+//             multipop(R2, R3);
+//         endif ;
+//         [PTBR + cnt*2] = -1;        
+//         [PTBR + cnt*2 + 1] = "0000";
+//         cnt = cnt + 1;
+//     endwhile ;
+//     alias diskMapTable R4;
+//     diskMapTable = DISK_MAP_TABLE + 10*currentPID;
+//     cnt = 2;
+//         while(cnt < 10) do
+//             if([diskMapTable + cnt] != -1) then
+//                 //Release Block function (Memory Manager Mod 2 )
+//                 multipush(R2, R3, R4);
+//                 R3 = currentPID;
+//                 R2 = [diskMapTable + cnt];
+//                 R1 = 4;
+//                 call MOD_2;
+//                 multipop(R2, R3, R4);
+//             endif ;
+
+//             if( cnt == 3 ) then
+//                 cnt = 8;
+//             else
+//                 cnt = cnt + 1;
+//             endif ;
+//         endwhile;
+
+//     // Invalidate the DISK MAP TABLE 
+// 	cnt = 0;
+// 	while(cnt <= 9) do
+// 		[DISK_MAP_TABLE + currentPID*10 + cnt] = -1;
+//         cnt = cnt + 1;
+// 	endwhile;
+
+//     return;
+// endif;
+
+
+
+
+// //KILL_ALL = 5------ Args - PID, Return NIL
+// // Kills all the processes except the current process, idle and init/login*.
+// // Called by shutdown and logout system call
+
+// if(functionNum == 5) then
+
+//     alias pid R6;
+//     pid = R2;
+
+//     // Lock all files to ensure that no processes are in the middle of a file operation 
+//     alias cnt R5;
+//     cnt = 0;
+//     while( cnt < 60 ) do
+//         // For each valid entry in the Inode table	
+//         if([INODE_TABLE + cnt*16 + 1 != -1]) then
+//             // lock file
+//             R1 = ACQUIRE_INODE;
+//             R2 = cnt;
+//             R3 = [SYSTEM_STATUS_TABLE+1];
+//             multipush(R6, R5);
+//             call RESOURCE_MANAGER;
+//             multipop(R6, R5);
+//         endif;
+//         cnt = cnt + 1;
+//     endwhile ;
+
+//     // For each pid from 2 to MAX_PROC_NUM(=16) - 1 	/* PID 0 is idle and 1 is init */
+//     cnt = 2;
+//     while (cnt < MAX_PROC_NUM - 1) do
+//         // If pid != pid of the current process AND state of the process in the process table entry is not TERMINATED
+//         if( cnt != pid && [PROCESS_TABLE+cnt*16 + 4] != TERMINATED ) then
+//             R1 = 3;
+//             R2 = cnt;
+//             multipush(R6, R5);
+//             call PROCESS_MANAGER;
+//             multipop(R6, R5);
+//         endif ;
+//         cnt = cnt + 1;
+//     endwhile;
+
+//     // For each valid entry in the Inode table, Release lock on the file by calling the release_inode() function in the Resource Manager module.
+//     cnt = 0;
+//     while( cnt < 60 ) do
+//         // For each valid entry in the Inode table	
+//         if([INODE_TABLE + cnt*16 + 1 != -1]) then
+//             // unlock file
+//             R1 = RELEASE_INODE;
+//             R2 = cnt;
+//             R3 = [SYSTEM_STATUS_TABLE+1];
+//             multipush(R6, R5);
+//             call RESOURCE_MANAGER;
+//             multipop(R6, R5);
+//         endif;
+//         cnt = cnt + 1;
+//     endwhile ;
+
+//     return;
+// endif;
+
+
+
+
+
+
 alias functionNum R1;
-//Functions : GET_PCB_ENTRY(1), FREE_USER_AREA_PAGE(2), EXIT_PROCESS(3), FREE_PAGE_TABLE(4), KILL_ALL(5)
 alias PID R2;
 
-//--FINAL
-//GET_PCB_ENTRY = 1------ Args - NIL, Return Index of Free PCB.
-// Returns a Free PCB index. Returns -1 if PCB is full
-// Called by Fork system call
-
+alias processEntry R7;
+processEntry = PROCESS_TABLE + PID*16;
+// ----- Get PCB Entry (funNum = 1) -----------
 if(functionNum == 1) then
     alias cnt R10;
     // Loop the process table to find free space and if found, set it up
     cnt = 0;
+    alias processEntry1 R9;
     while( cnt < 16 ) do
-        if([PROCESS_TABLE + cnt*16 + 4] == TERMINATED) then
+        processEntry1 = PROCESS_TABLE + cnt*16;
+        if([processEntry1 + 4] == TERMINATED) then
             // Set PID to index
-            [PROCESS_TABLE + cnt*16 + 1] = cnt;
+            [processEntry1 + 1] = cnt;
             // Set State
-            [PROCESS_TABLE + cnt*16 + 4] = ALLOCATED;
+            [processEntry1 + 4] = ALLOCATED;
             // Set PTBR and PTLR fields
-            [PROCESS_TABLE + cnt*16 + 14] = PAGE_TABLE_BASE + cnt*20;
-            [PROCESS_TABLE + cnt*16 + 15] = 10;
+            [processEntry1 + 14] = PAGE_TABLE_BASE + cnt*20;
+            [processEntry1+ 15] = 10;
             R0 = cnt;
             return;
         endif;
@@ -29,177 +285,160 @@ if(functionNum == 1) then
     return;
 endif;
 
-//--FINAL
-//FREE_USER_AREA_PAGE = 2 ------ Args - PID, Return NIL
-// Frees all the resources in the Resource Table inside the User Area page. Also frees the User Area page
-// Note : The function should be called only when no file/buffer/terminal resource is locked by the process.
-// Called by the exit_process function
-
-if( functionNum == 2 ) then
-    alias currentPID R7;
-    R7 = R2;
-
-    alias resourceTable R5;
-    resourceTable = [PROCESS_TABLE+currentPID*16+11]*512 + 496;
-
-    alias cnt R6;
+// ----- Free User Area Page (funNum = 2) -----
+if(functionNum == 2) then
+    // Loop the Per Process Resource Table and calling Release Semaphore (Resource Manager) for every Valid Entry
+    alias cnt R5;
     cnt = 0;
-    while( cnt < 8 ) do
-        if( [resourceTable + 2*cnt] == 1 ) then
-            R1 = 7;
-            R2 = [resourceTable + 2*cnt + 1];
-            R3 = currentPID;
-            multipush(R5, R6, R7);
-            call RESOURCE_MANAGER;
-            multipop(R5, R6, R7);  
+    while( cnt < 8) do
+        // If valid entry
+        if([[processEntry + 11] * 512 + 496 + 2*cnt] != -1) then
+            // if it's a FILE 
+            if([[processEntry + 11] * 512 + 496 + 2*cnt] == FILE) then
+                //--- Call Close() from File Manager Module -----
+                // args: funNum(4), Open File Table Index
+                // returns: NIL
+                multipush(R1,R2,R5);
+                    R1 = 4;
+                    R2 = [[processEntry+ 11] * 512 + 496 + 2*cnt + 1];
+                    call FILE_MANAGER;
+                multipop(R1,R2,R5);
+            endif;
+            // If it's a Semaphore
+            if([[PROCESS_TABLE + PID * 16 + 11] * 512 + 496 + 2*cnt] == 1) then
+                // calling Release Semaphore Function (Resource Manager)
+                multipush(R1,R2,R5,R7);
+                R3 = PID;
+                R1 = 7;
+                R2 = [[processEntry+ 11] * 512 + 496 + 2*cnt + 1];
+                call MOD_0;
+                multipop(R1,R2,R5,R7);
+            endif;
+            // Invalidate the entry
+            [[processEntry+ 11] * 512 + 496 + 2*cnt] = -1;
         endif;
-        if( [resourceTable + 2*cnt] == 0 ) then
-            R1 = 4;
-            R2 = [resourceTable + 2*cnt + 1];
-            multipush(R5, R6, R7);
-            call FILE_MANAGER;
-            multipop(R5, R6, R7);    
-        endif ;
         cnt = cnt + 1;
     endwhile;
 
-    //invoke Release Page function of Memory Manager Mod 2 
-    multipush(R2);
-    R1 = 2;
-    R2 = [PROCESS_TABLE + currentPID* 16 + 11];
-    call MOD_2;
-    multipop(R2);
-
-
-    return;
+    // calling Release Page (2), Args: funNum, User Area Page Number to free (get from Process Table)
+	multipush(R1,R2,R5,R7);
+	R1 = 2;
+	R2 = [processEntry + 11];
+	call MOD_2;
+	multipop(R1,R2,R5,R7);
+	return;
 endif;
 
+// ----- Exit Process (funNum = 3) ----
+if(functionNum == 3) then
 
-
-//---FINAL
-//EXIT_PROCESS = 3 ------ Args - PID, Return NIL
-// Terminate the process whose PID is provided
-// Note : The function should be called only when no file/terminal/disk/buffer resource is locked by the process.
-// Called by exec system call, exit system call, exception handler, shutdown and logout
-
-if( functionNum == 3 ) then
-    alias currentPID R2;
-
-    //invoke FREE_USER_AREA_PAGE function of Process Manager mod 1    
-    multipush(R2);
-    R1 = 2;
-    R2 = currentPID;
-    call MOD_1;
-    multipop(R2);
-
-    //invoke FREE_PAGE_TABLE function of Process Manager mod 1    
-    multipush(R2);
-    R1 = 4;
-    R2 = currentPID;
-    call MOD_1;
-    multipop(R2);
-
-    //Set state as TERMINATED
-    [PROCESS_TABLE + currentPID* 16 + 4] = TERMINATED;
-
-    //If MODE FLAG field not equal to 9 (Exec)
-    //Loop through the process table of all processes
-    //change the state to READY for the processes whose state is tuple (WAIT_PROCESS, current PID)
-    //if PPID of a process is PID of current process, invalidate PPID field to -1.
-
-    if( [PROCESS_TABLE + currentPID*16 + 9] != 9 ) then
-        alias cnt R15;
+    // Loop through Process Table Entries and Set to Ready and Mark Orphan Appropriately
+    // NOT VALID when called through EXEC
+    if([processEntry + 9] != 9) then
+        alias cnt R5;
         cnt = 0;
+        alias processEntry1 R9;
         while( cnt < 16 ) do
-            if( [PROCESS_TABLE + 16*cnt + 4] == WAIT_PROCESS &&  [PROCESS_TABLE + 16*cnt + 5] == currentPID) then
-                [PROCESS_TABLE + 16*cnt + 4] = READY;
-            endif ;
-            if([PROCESS_TABLE + 16*cnt + 2] == currentPID) then
-                [PROCESS_TABLE + 16*cnt + 2] = -1;
-            endif ;
+            processEntry1 = PROCESS_TABLE + cnt*16;
+            if([processEntry1 + 4] == WAIT_PROCESS && [processEntry1 + 5] == PID) then
+                [processEntry1 + 4] = READY;
+            endif;
+            if([processEntry1 + 2] == PID) then
+                [processEntry1 + 2] = -1;
+            endif;
             cnt = cnt + 1;
         endwhile;
-    endif ;
-    return;
+    endif;
+
+    // Free Page Table (4), ARGS: funNum, PID
+	multipush(R1,R2,R5,R7);
+	R1 = 4;
+	R2 = PID;
+	call MOD_1;
+	multipop(R1,R2,R5,R7);
+    // Free User Area Page, ARGS: funNum, PID
+	multipush(R1,R2,R5,R7);
+	R1 = 2;
+	R2 = PID;
+	call MOD_1;
+	multipop(R1,R2,R5,R7);
+    // Set State
+	[processEntry + 4] = TERMINATED;
+	return;
+
 endif;
 
+// ---- Free Page Table (funNum = 4) ----
+if(functionNum == 4) then
+    PTBR = PAGE_TABLE_BASE + PID*20;
 
-
-//---FINAL---
-//--FREE_PAGE_TABLE = 4 ------ Args - PID, Return NIL
-// Free the page table entry and the used pages. The Disk Map table entries are also freed.
-// Called by the exit_process function
-
-if( functionNum == 4 ) then
-    alias currentPID R2;
-    
-    PTBR = PAGE_TABLE_BASE + 20*currentPID;
-    PTLR = 10;
-
-    // Library
+    // Library Invalidated
     [PTBR + 0] = -1;
 	[PTBR + 1] = "0000";
 	[PTBR + 2] = -1;
 	[PTBR + 3] = "0000";
-    alias cnt R3;
-    cnt = 2;
-    while( cnt < 10 ) do
-        if([PTBR + cnt*2] != -1) then
 
-            //invoke Release Page function of Memory Manager Mod 2 
-            multipush(R2, R3);
+    // Heap, Code, Stack Freed
+    alias counter R4;
+    counter = 4;
+    while(counter<20) do
+        if([PTBR + counter] != -1) then
+            // calling Release Page
+            multipush(R1,R2,R4);
             R1 = 2;
-            R2 = [PTBR + cnt*2];
+            R2 = [PTBR + counter];
             call MOD_2;
-            multipop(R2, R3);
-        endif ;
-        [PTBR + cnt*2] = -1;        
-        [PTBR + cnt*2 + 1] = "0000";
-        cnt = cnt + 1;
-    endwhile ;
-    alias diskMapTable R4;
-    diskMapTable = DISK_MAP_TABLE + 10*currentPID;
-    cnt = 2;
-        while(cnt < 10) do
-            if([diskMapTable + cnt] != -1) then
-                //Release Block function (Memory Manager Mod 2 )
-                multipush(R2, R3, R4);
-                R3 = currentPID;
-                R2 = [diskMapTable + cnt];
+            [PTBR + counter] = -1;
+            [PTBR + counter+1] = "0000";
+            multipop(R1,R2,R4);
+        endif;
+        counter = counter + 2;
+    endwhile;
+
+    alias diskMapEntry R8;
+    diskMapEntry = DISK_MAP_TABLE + PID*10;
+
+    // print("pro:return!");
+    // Check Disk Map Table for Any Temporary Disk Block Allocations for Stack/Heap
+    // 2 and 3 => Heap
+    // 8 and 9 => Stack
+    counter = 2;
+    while(counter < 10) do
+        if([diskMapEntry + counter] != -1) then
+            // Call Release Block Function (FunNum = 4, Memory Manager)
+            // ARGS: FunNum, Block Number, PID
+            multipush(R1,R2,R3,R4,R8);
+                R3 = PID;
+                R2 = [diskMapEntry + counter];
                 R1 = 4;
                 call MOD_2;
-                multipop(R2, R3, R4);
-            endif ;
+            multipop(R1,R2,R3,R4,R8);
+        endif;
+        if(counter == 3) then
+            counter = 8;
+        else
+            counter = counter + 1;
+        endif;
+    endwhile;
 
-            if( cnt == 3 ) then
-                cnt = 8;
-            else
-                cnt = cnt + 1;
-            endif ;
-        endwhile;
-
-    // Invalidate the DISK MAP TABLE 
-	cnt = 0;
-	while(cnt <= 9) do
-		[DISK_MAP_TABLE + currentPID*10 + cnt] = -1;
-        cnt = cnt + 1;
+    // Invalidate the DISK MAP TABLE for this Process 
+	counter = 0;
+	while(counter <= 9) do
+		[diskMapEntry + counter] = -1;
+        counter = counter + 1;
 	endwhile;
-
+    // print("pro:return!");
     return;
 endif;
 
-
-
-
-//KILL_ALL = 5------ Args - PID, Return NIL
-// Kills all the processes except the current process, idle and init/login*.
+// ---- KILL ALL (funNum = 5) ------------------------------------------------
+// Kills all the processes except the current process, idle and init/login
+// Args: 1. PID
 // Called by shutdown and logout system call
 
 if(functionNum == 5) then
-
     alias pid R6;
     pid = R2;
-
     // Lock all files to ensure that no processes are in the middle of a file operation 
     alias cnt R5;
     cnt = 0;
@@ -217,7 +456,8 @@ if(functionNum == 5) then
         cnt = cnt + 1;
     endwhile ;
 
-    // For each pid from 2 to MAX_PROC_NUM(=16) - 1 	/* PID 0 is idle and 1 is init */
+    // For each pid from 2 to MAX_PROC_NUM(=16) - 1 	
+    //* PID 0 is idle and 1 is init *//
     cnt = 2;
     while (cnt < MAX_PROC_NUM - 1) do
         // If pid != pid of the current process AND state of the process in the process table entry is not TERMINATED
@@ -231,7 +471,8 @@ if(functionNum == 5) then
         cnt = cnt + 1;
     endwhile;
 
-    // For each valid entry in the Inode table, Release lock on the file by calling the release_inode() function in the Resource Manager module.
+    // For each valid entry in the Inode table: 
+    // Release lock on the file by calling the release_inode() function in the Resource Manager module.
     cnt = 0;
     while( cnt < 60 ) do
         // For each valid entry in the Inode table	

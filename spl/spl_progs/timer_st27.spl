@@ -7,7 +7,7 @@
 SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11] * 512 - 1;
 
 backup;
-
+//print "mem free cnt"; print [SYSTEM_STATUS_TABLE + 2];
 // --- PAGING SET UPS
 
 // If swapping is initiated (check System Status Table - PAGING_STATUS field) 

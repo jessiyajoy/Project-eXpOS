@@ -120,6 +120,64 @@ endif;
 
 
 
+// //---FINAL---
+// //-----GET_CODE_PAGE = 5 ----- Args - Block Number, Return Page Number
+// // Loads a single code page to memory given the block number of the page in the disk
+
+// if( functionNum == 5 ) then
+//     alias codeBlock R8;
+//     codeBlock = R2;
+//     print "block1"; print R2; print codeBlock;
+//     alias pid R3;
+//     pid = 0;
+//     alias diskMapTable R4;
+//     alias cnt R5;
+//     alias pageTable R6;
+//     alias pageNo R7;
+//     //alias auxInfo R8;
+    
+//     while( pid < 16 ) do
+//         diskMapTable = DISK_MAP_TABLE + 10*pid;
+//         pageTable = PAGE_TABLE_BASE + 20*pid + 8;
+//         cnt = 0;
+//         while(cnt < 4) do
+//             //auxInfo = [pageTable + cnt*2 + 1 ];
+//             if( [diskMapTable + 4 + cnt] == codeBlock &&  [pageTable + cnt*2 ] != -1) then
+//                 //Increment entry in the memory free list
+//                 pageNo = [pageTable + cnt*2 ];
+//                 [MEMORY_FREE_LIST + pageNo] = [MEMORY_FREE_LIST + pageNo] + 1; 
+
+//                 //return page number
+//                 R0 = pageNo;
+//                 return;
+//             endif ;
+//             cnt = cnt + 1;
+//         endwhile;
+//         pid = pid + 1;
+//     endwhile ;
+//     print "b1";
+//     //---code page is not in memory----has to be loaded from disk 
+//     //---Get Free Page function (memory manager) to allocate a new page.
+//     multipush(R8);
+//     R1 = GET_FREE_PAGE;
+//     call MEMORY_MANAGER;
+//     multipop(R8);
+//     pageNo = R0;
+//             print "block2"; print codeBlock;
+//      //Calling Disk load function 2 in device manager module (module 4)
+//     multipush(R7, R8); 
+//     R1 = DISK_LOAD;
+//     R2 = [SYSTEM_STATUS_TABLE + 1];
+//     R3 = pageNo;
+//     R4 = codeBlock; 
+//     call DEVICE_MANAGER; 
+//     multipop(R7, R8);
+//     R0 = R0;
+//     print "jhii";
+//     return;
+// endif;
+
+
 //---FINAL---
 //-----GET_CODE_PAGE = 5 ----- Args - Block Number, Return Page Number
 // Loads a single code page to memory given the block number of the page in the disk
@@ -174,6 +232,7 @@ if( functionNum == 5 ) then
     breakpoint;
     return;
 endif;
+
 
 //GET_SWAP_BLOCK = 6 ----- Args - NIL,Ret Block Number
 // Returns the block number of a free disk block in the swap area

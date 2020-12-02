@@ -143,15 +143,14 @@ if(syscallNum == 23) then
         [returnAddress] = -1;
         goto end;
     endif;
-
     alias userID R9;
     userID = cnt;
 
     // Loop through the Root File and exit returning -3 if there are files of the user present on disk.
     cnt = 0;
     while( cnt < MAX_FILE_NUM ) do
-        if( [ROOT_FILE + 8*cnt + 3 ] == username ) then
-            [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -3;
+        if([ROOT_FILE + 8*cnt ] != -1 && [ROOT_FILE + 8*cnt + 3 ] == username) then
+            [returnAddress] = -3;
             goto end;
         endif;
         cnt = cnt +1;
