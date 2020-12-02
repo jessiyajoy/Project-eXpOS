@@ -1,539 +1,539 @@
-// //---- SYSTEM CALLS :
-
-// //2. OPEN SYSTEM CALL
-// //3. CLOSE SYSTEM CALL
-// //6. SEEK SYSTEM CALL
-
-// alias syscallNum R15;
-// syscallNum = [([PTBR + 2 * ((SP - 5) / 512)] * 512) + ((SP - 5) % 512)];
-// alias userSP R5;
-// userSP = SP;
-
-// alias processEntry R6;
-// processEntry = PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16;
-
-// //--Switch Stack
-// //save user SP, set SP to KPTR
-// [processEntry + 13] = SP;
-// SP = [processEntry + 11] * 512 - 1;
-
-
-
-
-// //---OPEN SYSTEM CALL
-// //Args - Filename (String)
-// //Return : 
-// //  File Descriptor (Integer)	Success, the return value is the file descriptor for the opened file.
-// // -1	File not found or file is not a data or root file
-// // -2	System has reached its limit of open files
-// // -3	Process has reached its limit of resources
-
-// if(syscallNum == 2) then
-
-//     // MODE
-//     [processEntry + 9] = 2;
-
-//     alias filename R7;
-//     filename = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
-//     alias resourceTable R8;
-//     resourceTable = [processEntry + 11]*512 + RESOURCE_TABLE_OFFSET;
-
-//     //FREE ENTRY in PER PROCESS RESOURCE TABLE
-//     alias cnt R9;
-//     cnt = 0;
-//     while(cnt < 8) do
-//         if( [resourceTable + cnt*2] == -1 ) then
-//             break;
-//         endif;
-//         cnt = cnt + 1;
-//     endwhile;
-//     //print "restable";
-//     //print cnt;
-//     //no free entry in PER PROCESS RESOURCE TABLE
-//     if(cnt == 8) then
-//         [([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512)] = -3;
-//         goto end;
-//     endif;
-
-//     alias fileDesc R10;
-//     fileDesc = cnt;
-
-//     //open() function in the File Manager module, returns free open file table index
-//     R1 = 3;
-//     R2 = filename;
-//     multipush(R5, R6, R7, R8, R9, R10);
-//     call FILE_MANAGER;
-//     multipop(R5, R6, R7, R8, R9, R10);
-
-//     //print "open";
-//     //print R0;
-
-//     // if Open fails, return the error code
-//     // open returns : -1 - file not found, locking fails(ACQUIRE_INODE), not data file
-//     // -2 - reached maximum number of open files in the system
-//     if(R0 == -1 || R0 == -2) then
-//         [([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512)] = R0;
-//         goto end;
-//     endif;
-
-//     alias openFileIndex R11;
-//     openFileIndex = R0;
-
-//     [resourceTable + fileDesc*2] = FILE;
-//     [resourceTable + fileDesc*2 + 1] = openFileIndex;
-
-//     [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = fileDesc;
-//     goto end;
-// endif;
-
-
-
-// //---CLOSE SYSTEM CALL
-// //Args - File Descriptor (Integer)
-// //Return : 
-// //  0	Success
-// // -1	File Descriptor given is invalid
-// if(syscallNum == 3) then
-
-//     // MODE
-//     [processEntry + 9] = 3;
-
-//     alias fileDesc R7;
-//     fileDesc = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
-
-//     alias resourceTable R8;
-//     resourceTable = [processEntry + 11]*512 + RESOURCE_TABLE_OFFSET;
-
-//     // fileDesc invalid if not in range 0 - 7
-//     if(fileDesc > 7 || fileDesc<0) then
-//         [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
-//         goto end;
-//     endif;  
-
-//     //if resource identifier field of table entry is not 0
-//     if([resourceTable + 2*fileDesc] != FILE) then
-//         [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
-//         goto end;
-//     endif;  
-
-//     alias openFileIndex R9;
-//     openFileIndex = [resourceTable + 2*fileDesc +1];
-
-//     //close() function in File Manager module
-//     R1 = 4;
-//     R2 = openFileIndex;
-//     multipush(R5, R6, R7, R8, R9);
-//     call FILE_MANAGER;
-//     multipop(R5, R6, R7, R8, R9);
-
-//     [resourceTable + fileDesc*2] = -1;
-
-//     [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = 0;    
-//     goto end;
-// endif;
-
-
-
-// //---SEEK SYSTEM CALL
-// //Args - File Descriptor(Integer) , Offset (Integer)
-// //Return : 
-// //  0	Success
-// // -1	File Descriptor given is invalid
-// // -2	Offset value moves the file pointer to a position outside the file
-// if(syscallNum == 6) then
-
-//     // MODE
-//     [processEntry + 9] = 6;
-
-//     alias fileDesc R7;
-//     fileDesc = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
-
-//     // fileDesc invalid if not in range 0 - 7
-//     if(fileDesc > 7 || fileDesc<0) then
-//         [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
-//         goto end;
-//     endif;  
-
-//     alias resourceTable R8;
-//     resourceTable = [processEntry + 11]*512 + RESOURCE_TABLE_OFFSET;
-
-//     //if resource identifier field of table entry is not 0
-//     if([resourceTable + 2*fileDesc] != FILE) then
-//         [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
-//         goto end;
-//     endif;  
-
-//     // Get the index of the Open File Table entry from the Per Process Resource Table entry.
-//     alias openFileTableEntry R9;
-//     openFileTableEntry = OPEN_FILE_TABLE + 4*[resourceTable + 2*fileDesc +1];
-
-//     // Get the index of the Inode Table entry from the Open File Table entry. 
-//     alias inodeIndex R10;
-//     inodeIndex = [openFileTableEntry];
-
-//     // lock file
-//     // CALL ACQUIRE_INODE, RESOURCE MANAGER 0
-//     R1 = ACQUIRE_INODE;
-//     R2 = inodeIndex;
-//     R3 = [SYSTEM_STATUS_TABLE+1];
-//     multipush(R5, R6, R7, R8, R9, R10);
-//     call RESOURCE_MANAGER;
-//     multipop(R5, R6, R7, R8, R9, R10);
-
-//     //locking fails
-//     if(R0 == -1) then
-//         [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
-//         goto end;
-//     endif;
-
-//     // Get the Lseek position from the Open File Table entry
-//     alias lseek R11;
-//     lseek = [openFileTableEntry + 2];
-
-//     alias inodeEntry R12;
-//     inodeEntry = INODE_TABLE + inodeIndex*16;
-
-//     alias offset R13;
-//     offset = [([PTBR + 2*((userSP-3)/512)]*512) + ((userSP-3)%512)];
-
-//     alias fileSize R14;
-
-//     // Check the validity of the given offset
-
-//     // 1. Get the file size of the file from the Inode Table (Use 480 if inode index is "INODE_ROOT")
-//     if( inodeIndex == INODE_ROOT ) then
-//         fileSize = 480;
-//     else
-//         fileSize = [inodeEntry + 2];
-//     endif ;
-
-//     // 2. If (lseek + the given offset) is less than 0, release_inode() and return -2.  
-//     if( lseek + offset < 0 ) then
-
-//         // release lock on file
-//         // CALL RELEASE_INODE, RESOURCE MANAGER 0
-//         R1 = RELEASE_INODE;
-//         R2 = inodeIndex;
-//         R3 = [SYSTEM_STATUS_TABLE+1];
-//         multipush(R5, R6);
-//         call RESOURCE_MANAGER;
-//         multipop(R5, R6);
-//         // print "offset -2";
-//         // print lseek;
-//         // print offset;
-//         [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -2;    
-//         goto end;        
-//     endif ;
-
-//     // If the given offset is 0,
-// 	//      Set lseek value in the Open File Table entry to 0.
-//     // else if lseek+offset is greater than the file size,
-// 	//      Set the lseek value to file size. /* Check inode table for file size */
-//     // else
-// 	//      Change the lseek value in the Per-Process Resource Table entry to lseek+offset.
-
-//     if( offset == 0 ) then
-//         [openFileTableEntry + 2] = 0;
-//     else
-//         if( lseek + offset > fileSize ) then
-//             [openFileTableEntry + 2] = fileSize;
-//         else
-//             [openFileTableEntry + 2] = lseek + offset;
-//         endif ;
-//     endif ;
-
-//     // release lock on file
-//     // CALL RELEASE_INODE, RESOURCE MANAGER 0
-//     R1 = RELEASE_INODE;
-//     R2 = inodeIndex;
-//     R3 = [SYSTEM_STATUS_TABLE+1];
-//     multipush(R5, R6);
-//     call RESOURCE_MANAGER;
-//     multipop(R5, R6);
-
-//     [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = 0;    
-//     goto end;  
-// endif;
-
-
-
-
-// end :
-// //switch stack, mode
-// SP = [processEntry + 13]; 
-// [processEntry + 9] = 0;
-
-// ireturn;
-
-
-
-
-// ---- FILE SYSCALLS: ---------- 
-// Open = 2
-// Close = 3
-// Seel = 6
-
-//---- Extract Syscall Number from User stack (at userSP - 5)------------
-alias SysCallNum R1;
-alias userSP R2;
+//---- SYSTEM CALLS :
+
+//2. OPEN SYSTEM CALL
+//3. CLOSE SYSTEM CALL
+//6. SEEK SYSTEM CALL
+
+alias syscallNum R15;
+syscallNum = [([PTBR + 2 * ((SP - 5) / 512)] * 512) + ((SP - 5) % 512)];
+alias userSP R5;
 userSP = SP;
-SysCallNum = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 5)/ 512] * 512 + ((userSP - 5) % 512)];
 
-//---- Switch Stack --------------------------------------------------------------------------------------------
-[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+13] = SP;
-SP = [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512-1;
+alias processEntry R6;
+processEntry = PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16;
 
-alias physicalAddrRetVal R3;
-physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
-alias processTableEntry R4;
-processTableEntry = PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16;
-alias perProcessEntry R7;
-perProcessEntry = [processTableEntry+ 11]*512 + RESOURCE_TABLE_OFFSET;
+//--Switch Stack
+//save user SP, set SP to KPTR
+[processEntry + 13] = SP;
+SP = [processEntry + 11] * 512 - 1;
 
-//---- Syscalls OPEN(syscallNum = 2) and CLOSE(syscallNum = 3) (FILES)-------------------------------------------------------------
 
-//---- OPEN (Syscall Num = 2) -------------------------------------------------------------------------------------
-// Args:
-// 1. filename
-// returns:
-// fd : file descriptor (per process resource table index)
-// -1 : File not found or file is not a data or root file
-// -2 : System has reached its limit of open files
-// -3 : Process has reached its limit of resources
 
-if(SysCallNum == 2) then
-    //---- Mode Flag -----
-    [processTableEntry + 9] = 2;
 
-    //--- Get Arg ---------
-    alias fileName R5;
-    fileName = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 4)/ 512] * 512 + ((userSP - 4) % 512)];
+//---OPEN SYSTEM CALL
+//Args - Filename (String)
+//Return : 
+//  File Descriptor (Integer)	Success, the return value is the file descriptor for the opened file.
+// -1	File not found or file is not a data or root file
+// -2	System has reached its limit of open files
+// -3	Process has reached its limit of resources
 
-    //--- Finding Free PER PROCESS RESOURCE TABLE Entry ------------
-    alias cnt R6;
+if(syscallNum == 2) then
+
+    // MODE
+    [processEntry + 9] = 2;
+
+    alias filename R7;
+    filename = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
+    alias resourceTable R8;
+    resourceTable = [processEntry + 11]*512 + RESOURCE_TABLE_OFFSET;
+
+    //FREE ENTRY in PER PROCESS RESOURCE TABLE
+    alias cnt R9;
     cnt = 0;
-    while ( cnt < 8 ) do
-        if([perProcessEntry + cnt*2] == -1) then
+    while(cnt < 8) do
+        if( [resourceTable + cnt*2] == -1 ) then
             break;
         endif;
         cnt = cnt + 1;
     endwhile;
+    //print "restable";
+    //print cnt;
+    //no free entry in PER PROCESS RESOURCE TABLE
     if(cnt == 8) then
-        // No free Per Process Table Entry
-        // return -3
-        [physicalAddrRetVal] = -3;
-        [processTableEntry + 9] = 0;
-        SP = userSP;
-        ireturn;
+        [([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512)] = -3;
+        goto end;
     endif;
 
-    //--- Call Open() from File Manager Module -----
-    // args: funNum(3), fileName
-    // returns: Open File Table Entry Index, -1 or -2
-    multipush(R1,R2,R3,R4,R5,R6,R7);
-        R1 = 3;
-        R2 = fileName;
-        call FILE_MANAGER;
-    multipop(R1,R2,R3,R4,R5,R6,R7);
-    alias openFileTableIndex R8;
-    openFileTableIndex = R0;
-    if( openFileTableIndex == -1 || openFileTableIndex == -2 ) then
-        // Open() Failed , return error code
-        [physicalAddrRetVal] = openFileTableIndex;
-        [processTableEntry + 9] = 0;
-        SP = userSP;
-        ireturn;
+    alias fileDesc R10;
+    fileDesc = cnt;
+
+    //open() function in the File Manager module, returns free open file table index
+    R1 = 3;
+    R2 = filename;
+    multipush(R5, R6, R7, R8, R9, R10);
+    call FILE_MANAGER;
+    multipop(R5, R6, R7, R8, R9, R10);
+
+    //print "open";
+    //print R0;
+
+    // if Open fails, return the error code
+    // open returns : -1 - file not found, locking fails(ACQUIRE_INODE), not data file
+    // -2 - reached maximum number of open files in the system
+    if(R0 == -1 || R0 == -2) then
+        [([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512)] = R0;
+        goto end;
     endif;
 
-    //--- Setting Up the Per Process Resource Table Entry ----------------------------------
-    [perProcessEntry + cnt*2] =  FILE;                    // RId
-    [perProcessEntry + cnt*2 + 1] =  openFileTableIndex;  // Index
+    alias openFileIndex R11;
+    openFileIndex = R0;
 
-    //---- Return the cnt => fd : File Descriptor, Index in the Per Process Reource Table Entry 
-    [physicalAddrRetVal] = cnt;
-    [processTableEntry + 9] = 0;
-    SP = userSP;
-    ireturn;
+    [resourceTable + fileDesc*2] = FILE;
+    [resourceTable + fileDesc*2 + 1] = openFileIndex;
 
+    [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = fileDesc;
+    goto end;
 endif;
 
-//---- CLOSE (Syscall Num = 3) ----------------------------------------------------
-// Args:
-// 1. File Descriptor (fd, Index of Resorce in Per Process Resource Table, use the index to get the inodeindex for the file) 
-// returns:
-// -1 : fd, file descriptor is invalid
-if(SysCallNum == 3) then
-    //---- Mode Flag -----
-    [processTableEntry + 9] = 3;
 
-    //--- Get Arg ---------
-    alias fd R5;
-    fd = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 4)/ 512] * 512 + ((userSP - 4) % 512)];
 
-    // Validity of fd : (0-7) range
-    if( fd < 0 || fd > 7) then
-        [physicalAddrRetVal] = -1;
-        [processTableEntry + 9] = 0;
-        SP = userSP;
-        ireturn;
-    endif;
+//---CLOSE SYSTEM CALL
+//Args - File Descriptor (Integer)
+//Return : 
+//  0	Success
+// -1	File Descriptor given is invalid
+if(syscallNum == 3) then
 
-    // Validity of Per Process Reource Table Entry
-    // /* No file is open with this file descriptor. */
-    if([perProcessEntry + fd*2] != FILE) then
-        // return -1
-        [physicalAddrRetVal] = -1;
-        [processTableEntry + 9] = 0;
-        SP = userSP;
-        ireturn;
-    endif;
+    // MODE
+    [processEntry + 9] = 3;
 
-    // ---- Get the Open File Table Index using fd from Per Process Resource Table
-    alias openFileTableIndex R6;
-    openFileTableIndex = [perProcessEntry + fd*2 + 1];
+    alias fileDesc R7;
+    fileDesc = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
 
-    //--- Call Close() from File Manager Module -----
-    // args: funNum(4), Open File Table Index
-    // returns: NIL
-    multipush(R1,R2,R3,R4,R5,R6,R7);
-        R1 = 4;
-        R2 = openFileTableIndex;
-        call FILE_MANAGER;
-    multipop(R1,R2,R3,R4,R5,R6,R7);
+    alias resourceTable R8;
+    resourceTable = [processEntry + 11]*512 + RESOURCE_TABLE_OFFSET;
 
-    //--- Invalidate the Per Process Resource Table Entry ---------------
-    // Set Resource Identifier field to -1
-    [perProcessEntry + fd*2] = -1;
+    // fileDesc invalid if not in range 0 - 7
+    if(fileDesc > 7 || fileDesc<0) then
+        [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
+        goto end;
+    endif;  
 
-    //--- Return 0, Success -----------
-    [physicalAddrRetVal] = 0;
-    [processTableEntry + 9] = 0;
-    SP = userSP;
-    ireturn;
+    //if resource identifier field of table entry is not 0
+    if([resourceTable + 2*fileDesc] != FILE) then
+        [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
+        goto end;
+    endif;  
 
+    alias openFileIndex R9;
+    openFileIndex = [resourceTable + 2*fileDesc +1];
+
+    //close() function in File Manager module
+    R1 = 4;
+    R2 = openFileIndex;
+    multipush(R5, R6, R7, R8, R9);
+    call FILE_MANAGER;
+    multipop(R5, R6, R7, R8, R9);
+
+    [resourceTable + fileDesc*2] = -1;
+
+    [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = 0;    
+    goto end;
 endif;
 
-//---- SEEK (Syscall Num = 6) ----------------------------------------------------
-// Args:
-// 1. File Descriptor (fd, Index of Resorce in Per Process Resource Table, use the index to get the inodeindex for the file) 
-// 2. Offset
-// returns:
-// -1 : fd, file descriptor is invalid
-if(SysCallNum == 6) then
-    //---- Mode Flag -----
-    [processTableEntry + 9] = 6;
 
-    //--- Get Arg ---------
-    alias fd R5;
-    fd = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 4)/ 512] * 512 + ((userSP - 4) % 512)];
-    alias offset R11;
-    offset = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 3)/ 512] * 512 + ((userSP - 3) % 512)];
 
-    // Validity of fd : (0-7) range
-    if( fd < 0 || fd > 7) then
-        [physicalAddrRetVal] = -1;
-        [processTableEntry + 9] = 0;
-        SP = userSP;
-        ireturn;
-    endif;
+//---SEEK SYSTEM CALL
+//Args - File Descriptor(Integer) , Offset (Integer)
+//Return : 
+//  0	Success
+// -1	File Descriptor given is invalid
+// -2	Offset value moves the file pointer to a position outside the file
+if(syscallNum == 6) then
 
-    // Validity of Per Process Reource Table Entry
-    // /* No file is open with this file descriptor. */
-    if([perProcessEntry + fd*2] != FILE) then
-        // return -1
-        [physicalAddrRetVal] = -1;
-        [processTableEntry + 9] = 0;
-        SP = userSP;
-        ireturn;
-    endif;
+    // MODE
+    [processEntry + 9] = 6;
 
-    // ---- Get the Open File Table Index using fd from Per Process Resource Table
-    alias openFileTableIndex R6;
-    openFileTableIndex = [perProcessEntry + fd*2 + 1];
+    alias fileDesc R7;
+    fileDesc = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
 
-    // --- Get the Inode Index 
-    alias inodeindex R9;
-    inodeindex = [OPEN_FILE_TABLE + openFileTableIndex*4 + 0];
+    // fileDesc invalid if not in range 0 - 7
+    if(fileDesc > 7 || fileDesc<0) then
+        [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
+        goto end;
+    endif;  
 
-    // /* Lock the inode */
-    // Calling Acquire_Inode() Resource Manager
-    // Args:
-    // funNum = 4, inodeTableIndex, PID
-    multipush(R1,R2,R3,R4,R5,R6,R7,R9,R11);
-        R1 = 4;
-        R2 = inodeindex;
-        R3 = [SYSTEM_STATUS_TABLE + 1];
-        call MOD_0;
-    multipop(R1,R2,R3,R4,R5,R6,R7,R9,R11);
+    alias resourceTable R8;
+    resourceTable = [processEntry + 11]*512 + RESOURCE_TABLE_OFFSET;
+
+    //if resource identifier field of table entry is not 0
+    if([resourceTable + 2*fileDesc] != FILE) then
+        [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
+        goto end;
+    endif;  
+
+    // Get the index of the Open File Table entry from the Per Process Resource Table entry.
+    alias openFileTableEntry R9;
+    openFileTableEntry = OPEN_FILE_TABLE + 4*[resourceTable + 2*fileDesc +1];
+
+    // Get the index of the Inode Table entry from the Open File Table entry. 
+    alias inodeIndex R10;
+    inodeIndex = [openFileTableEntry];
+
+    // lock file
+    // CALL ACQUIRE_INODE, RESOURCE MANAGER 0
+    R1 = ACQUIRE_INODE;
+    R2 = inodeIndex;
+    R3 = [SYSTEM_STATUS_TABLE+1];
+    multipush(R5, R6, R7, R8, R9, R10);
+    call RESOURCE_MANAGER;
+    multipop(R5, R6, R7, R8, R9, R10);
+
+    //locking fails
     if(R0 == -1) then
-        //return -1
-        [physicalAddrRetVal] = -1;
-        [processTableEntry + 9] = 0;
-        SP = userSP;
-        ireturn;
+        [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
+        goto end;
     endif;
 
-    // ---- Get Current Lseek Position ---------------------
-    alias lseek_addr R10;
-    lseek_addr = OPEN_FILE_TABLE + openFileTableIndex*4 + 2;
+    // Get the Lseek position from the Open File Table entry
+    alias lseek R11;
+    lseek = [openFileTableEntry + 2];
 
-    // --- Check the validity of the given Offset  -------------
-    // Get the fileSize
-    alias fileSize R12;
-    if(inodeindex == INODE_ROOT) then	
-        // file size of ROOT is 480
-		fileSize = 480;
-	else
-        // if file is not root
-		fileSize = [INODE_TABLE + 16*inodeindex + 2];
-	endif;
+    alias inodeEntry R12;
+    inodeEntry = INODE_TABLE + inodeIndex*16;
 
-    // if given offset takes lseek to < 0, return -2
-    if(([lseek_addr] + offset) < 0) then	
-        // relese inode
-		multipush(R1,R2,R3,R4,R5,R6,R7,R9,R10,R11,R12);
-		R3 = [SYSTEM_STATUS_TABLE + 1];
-		R1 = RELEASE_INODE;
-		R2 = inodeindex;
-		call MOD_0;
-		multipop(R1,R2,R3,R4,R5,R6,R7,R9,R10,R11,R12);
-		[physicalAddrRetVal] = -2;
-        [processTableEntry + 9] = 0;
-        SP = userSP;
-        ireturn;
-	endif;
+    alias offset R13;
+    offset = [([PTBR + 2*((userSP-3)/512)]*512) + ((userSP-3)%512)];
 
-    //---------- LSEEK UPDATE -------------- 
-    if(offset == 0) then
-        // setting ZERO
-		[lseek_addr] = 0;
-	else
-		if(([lseek_addr]+offset) > fileSize) then
-            // EOF
-			[lseek_addr] = fileSize;
-		else
-            // Update as given
-			[lseek_addr] = [lseek_addr] + offset;
-		endif;
-	endif;
+    alias fileSize R14;
 
-    // Calling Release_Inode() Resource Manager 
-    // Args:
-    // funNum = 5, inode Table Index, PID
-    multipush(R1,R2,R3,R4,R5,R6,R7,R9,R10,R11,R12);
-        R1 = 5;
-        R2 = inodeindex;
-        R3 = [SYSTEM_STATUS_TABLE + 1];
-        call MOD_0;
-    multipop(R1,R2,R3,R4,R5,R6,R7,R9,R10,R11,R12);
-    [physicalAddrRetVal] = 0;
-    [processTableEntry + 9] = 0;
-    SP = userSP;
-    ireturn;
+    // Check the validity of the given offset
 
+    // 1. Get the file size of the file from the Inode Table (Use 480 if inode index is "INODE_ROOT")
+    if( inodeIndex == INODE_ROOT ) then
+        fileSize = 480;
+    else
+        fileSize = [inodeEntry + 2];
+    endif ;
+
+    // 2. If (lseek + the given offset) is less than 0, release_inode() and return -2.  
+    if( lseek + offset < 0 ) then
+
+        // release lock on file
+        // CALL RELEASE_INODE, RESOURCE MANAGER 0
+        R1 = RELEASE_INODE;
+        R2 = inodeIndex;
+        R3 = [SYSTEM_STATUS_TABLE+1];
+        multipush(R5, R6);
+        call RESOURCE_MANAGER;
+        multipop(R5, R6);
+        // print "offset -2";
+        // print lseek;
+        // print offset;
+        [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -2;    
+        goto end;        
+    endif ;
+
+    // If the given offset is 0,
+	//      Set lseek value in the Open File Table entry to 0.
+    // else if lseek+offset is greater than the file size,
+	//      Set the lseek value to file size. /* Check inode table for file size */
+    // else
+	//      Change the lseek value in the Per-Process Resource Table entry to lseek+offset.
+
+    if( offset == 0 ) then
+        [openFileTableEntry + 2] = 0;
+    else
+        if( lseek + offset > fileSize ) then
+            [openFileTableEntry + 2] = fileSize;
+        else
+            [openFileTableEntry + 2] = lseek + offset;
+        endif ;
+    endif ;
+
+    // release lock on file
+    // CALL RELEASE_INODE, RESOURCE MANAGER 0
+    R1 = RELEASE_INODE;
+    R2 = inodeIndex;
+    R3 = [SYSTEM_STATUS_TABLE+1];
+    multipush(R5, R6);
+    call RESOURCE_MANAGER;
+    multipop(R5, R6);
+
+    [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = 0;    
+    goto end;  
 endif;
 
-//------ Change back to userSP ---------------------------------------------------------------------------------
-print("Wrong SyscallNum!");
-SP = userSP;
-ireturn; 
+
+
+
+end :
+//switch stack, mode
+SP = [processEntry + 13]; 
+[processEntry + 9] = 0;
+
+ireturn;
+
+
+
+
+// // ---- FILE SYSCALLS: ---------- 
+// // Open = 2
+// // Close = 3
+// // Seel = 6
+
+// //---- Extract Syscall Number from User stack (at userSP - 5)------------
+// alias SysCallNum R1;
+// alias userSP R2;
+// userSP = SP;
+// SysCallNum = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 5)/ 512] * 512 + ((userSP - 5) % 512)];
+
+// //---- Switch Stack --------------------------------------------------------------------------------------------
+// [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+13] = SP;
+// SP = [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512-1;
+
+// alias physicalAddrRetVal R3;
+// physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
+// alias processTableEntry R4;
+// processTableEntry = PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16;
+// alias perProcessEntry R7;
+// perProcessEntry = [processTableEntry+ 11]*512 + RESOURCE_TABLE_OFFSET;
+
+// //---- Syscalls OPEN(syscallNum = 2) and CLOSE(syscallNum = 3) (FILES)-------------------------------------------------------------
+
+// //---- OPEN (Syscall Num = 2) -------------------------------------------------------------------------------------
+// // Args:
+// // 1. filename
+// // returns:
+// // fd : file descriptor (per process resource table index)
+// // -1 : File not found or file is not a data or root file
+// // -2 : System has reached its limit of open files
+// // -3 : Process has reached its limit of resources
+
+// if(SysCallNum == 2) then
+//     //---- Mode Flag -----
+//     [processTableEntry + 9] = 2;
+
+//     //--- Get Arg ---------
+//     alias fileName R5;
+//     fileName = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 4)/ 512] * 512 + ((userSP - 4) % 512)];
+
+//     //--- Finding Free PER PROCESS RESOURCE TABLE Entry ------------
+//     alias cnt R6;
+//     cnt = 0;
+//     while ( cnt < 8 ) do
+//         if([perProcessEntry + cnt*2] == -1) then
+//             break;
+//         endif;
+//         cnt = cnt + 1;
+//     endwhile;
+//     if(cnt == 8) then
+//         // No free Per Process Table Entry
+//         // return -3
+//         [physicalAddrRetVal] = -3;
+//         [processTableEntry + 9] = 0;
+//         SP = userSP;
+//         ireturn;
+//     endif;
+
+//     //--- Call Open() from File Manager Module -----
+//     // args: funNum(3), fileName
+//     // returns: Open File Table Entry Index, -1 or -2
+//     multipush(R1,R2,R3,R4,R5,R6,R7);
+//         R1 = 3;
+//         R2 = fileName;
+//         call FILE_MANAGER;
+//     multipop(R1,R2,R3,R4,R5,R6,R7);
+//     alias openFileTableIndex R8;
+//     openFileTableIndex = R0;
+//     if( openFileTableIndex == -1 || openFileTableIndex == -2 ) then
+//         // Open() Failed , return error code
+//         [physicalAddrRetVal] = openFileTableIndex;
+//         [processTableEntry + 9] = 0;
+//         SP = userSP;
+//         ireturn;
+//     endif;
+
+//     //--- Setting Up the Per Process Resource Table Entry ----------------------------------
+//     [perProcessEntry + cnt*2] =  FILE;                    // RId
+//     [perProcessEntry + cnt*2 + 1] =  openFileTableIndex;  // Index
+
+//     //---- Return the cnt => fd : File Descriptor, Index in the Per Process Reource Table Entry 
+//     [physicalAddrRetVal] = cnt;
+//     [processTableEntry + 9] = 0;
+//     SP = userSP;
+//     ireturn;
+
+// endif;
+
+// //---- CLOSE (Syscall Num = 3) ----------------------------------------------------
+// // Args:
+// // 1. File Descriptor (fd, Index of Resorce in Per Process Resource Table, use the index to get the inodeindex for the file) 
+// // returns:
+// // -1 : fd, file descriptor is invalid
+// if(SysCallNum == 3) then
+//     //---- Mode Flag -----
+//     [processTableEntry + 9] = 3;
+
+//     //--- Get Arg ---------
+//     alias fd R5;
+//     fd = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 4)/ 512] * 512 + ((userSP - 4) % 512)];
+
+//     // Validity of fd : (0-7) range
+//     if( fd < 0 || fd > 7) then
+//         [physicalAddrRetVal] = -1;
+//         [processTableEntry + 9] = 0;
+//         SP = userSP;
+//         ireturn;
+//     endif;
+
+//     // Validity of Per Process Reource Table Entry
+//     // /* No file is open with this file descriptor. */
+//     if([perProcessEntry + fd*2] != FILE) then
+//         // return -1
+//         [physicalAddrRetVal] = -1;
+//         [processTableEntry + 9] = 0;
+//         SP = userSP;
+//         ireturn;
+//     endif;
+
+//     // ---- Get the Open File Table Index using fd from Per Process Resource Table
+//     alias openFileTableIndex R6;
+//     openFileTableIndex = [perProcessEntry + fd*2 + 1];
+
+//     //--- Call Close() from File Manager Module -----
+//     // args: funNum(4), Open File Table Index
+//     // returns: NIL
+//     multipush(R1,R2,R3,R4,R5,R6,R7);
+//         R1 = 4;
+//         R2 = openFileTableIndex;
+//         call FILE_MANAGER;
+//     multipop(R1,R2,R3,R4,R5,R6,R7);
+
+//     //--- Invalidate the Per Process Resource Table Entry ---------------
+//     // Set Resource Identifier field to -1
+//     [perProcessEntry + fd*2] = -1;
+
+//     //--- Return 0, Success -----------
+//     [physicalAddrRetVal] = 0;
+//     [processTableEntry + 9] = 0;
+//     SP = userSP;
+//     ireturn;
+
+// endif;
+
+// //---- SEEK (Syscall Num = 6) ----------------------------------------------------
+// // Args:
+// // 1. File Descriptor (fd, Index of Resorce in Per Process Resource Table, use the index to get the inodeindex for the file) 
+// // 2. Offset
+// // returns:
+// // -1 : fd, file descriptor is invalid
+// if(SysCallNum == 6) then
+//     //---- Mode Flag -----
+//     [processTableEntry + 9] = 6;
+
+//     //--- Get Arg ---------
+//     alias fd R5;
+//     fd = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 4)/ 512] * 512 + ((userSP - 4) % 512)];
+//     alias offset R11;
+//     offset = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 3)/ 512] * 512 + ((userSP - 3) % 512)];
+
+//     // Validity of fd : (0-7) range
+//     if( fd < 0 || fd > 7) then
+//         [physicalAddrRetVal] = -1;
+//         [processTableEntry + 9] = 0;
+//         SP = userSP;
+//         ireturn;
+//     endif;
+
+//     // Validity of Per Process Reource Table Entry
+//     // /* No file is open with this file descriptor. */
+//     if([perProcessEntry + fd*2] != FILE) then
+//         // return -1
+//         [physicalAddrRetVal] = -1;
+//         [processTableEntry + 9] = 0;
+//         SP = userSP;
+//         ireturn;
+//     endif;
+
+//     // ---- Get the Open File Table Index using fd from Per Process Resource Table
+//     alias openFileTableIndex R6;
+//     openFileTableIndex = [perProcessEntry + fd*2 + 1];
+
+//     // --- Get the Inode Index 
+//     alias inodeindex R9;
+//     inodeindex = [OPEN_FILE_TABLE + openFileTableIndex*4 + 0];
+
+//     // /* Lock the inode */
+//     // Calling Acquire_Inode() Resource Manager
+//     // Args:
+//     // funNum = 4, inodeTableIndex, PID
+//     multipush(R1,R2,R3,R4,R5,R6,R7,R9,R11);
+//         R1 = 4;
+//         R2 = inodeindex;
+//         R3 = [SYSTEM_STATUS_TABLE + 1];
+//         call MOD_0;
+//     multipop(R1,R2,R3,R4,R5,R6,R7,R9,R11);
+//     if(R0 == -1) then
+//         //return -1
+//         [physicalAddrRetVal] = -1;
+//         [processTableEntry + 9] = 0;
+//         SP = userSP;
+//         ireturn;
+//     endif;
+
+//     // ---- Get Current Lseek Position ---------------------
+//     alias lseek_addr R10;
+//     lseek_addr = OPEN_FILE_TABLE + openFileTableIndex*4 + 2;
+
+//     // --- Check the validity of the given Offset  -------------
+//     // Get the fileSize
+//     alias fileSize R12;
+//     if(inodeindex == INODE_ROOT) then	
+//         // file size of ROOT is 480
+// 		fileSize = 480;
+// 	else
+//         // if file is not root
+// 		fileSize = [INODE_TABLE + 16*inodeindex + 2];
+// 	endif;
+
+//     // if given offset takes lseek to < 0, return -2
+//     if(([lseek_addr] + offset) < 0) then	
+//         // relese inode
+// 		multipush(R1,R2,R3,R4,R5,R6,R7,R9,R10,R11,R12);
+// 		R3 = [SYSTEM_STATUS_TABLE + 1];
+// 		R1 = RELEASE_INODE;
+// 		R2 = inodeindex;
+// 		call MOD_0;
+// 		multipop(R1,R2,R3,R4,R5,R6,R7,R9,R10,R11,R12);
+// 		[physicalAddrRetVal] = -2;
+//         [processTableEntry + 9] = 0;
+//         SP = userSP;
+//         ireturn;
+// 	endif;
+
+//     //---------- LSEEK UPDATE -------------- 
+//     if(offset == 0) then
+//         // setting ZERO
+// 		[lseek_addr] = 0;
+// 	else
+// 		if(([lseek_addr]+offset) > fileSize) then
+//             // EOF
+// 			[lseek_addr] = fileSize;
+// 		else
+//             // Update as given
+// 			[lseek_addr] = [lseek_addr] + offset;
+// 		endif;
+// 	endif;
+
+//     // Calling Release_Inode() Resource Manager 
+//     // Args:
+//     // funNum = 5, inode Table Index, PID
+//     multipush(R1,R2,R3,R4,R5,R6,R7,R9,R10,R11,R12);
+//         R1 = 5;
+//         R2 = inodeindex;
+//         R3 = [SYSTEM_STATUS_TABLE + 1];
+//         call MOD_0;
+//     multipop(R1,R2,R3,R4,R5,R6,R7,R9,R10,R11,R12);
+//     [physicalAddrRetVal] = 0;
+//     [processTableEntry + 9] = 0;
+//     SP = userSP;
+//     ireturn;
+
+// endif;
+
+// //------ Change back to userSP ---------------------------------------------------------------------------------
+// print("Wrong SyscallNum!");
+// SP = userSP;
+// ireturn; 

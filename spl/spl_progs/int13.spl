@@ -1,254 +1,254 @@
 
-// //---- SYSTEM CALLS :
+//---- SYSTEM CALLS :
 
-// //17. SEMGET SYSTEM CALL
-// //18. SEMRELEASE SYSTEM CALL
+//17. SEMGET SYSTEM CALL
+//18. SEMRELEASE SYSTEM CALL
 
-// alias syscallNum R15;
-// syscallNum = [([PTBR + 2 * ((SP - 5) / 512)] * 512) + ((SP - 5) % 512)];
-// alias userSP R5;
-// userSP = SP;
-
-// //--Switch Stack
-// //save user SP, set SP to KPTR
-// [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP;
-// SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1;
-
-
-// //---SEMGET SYSTEM CALL
-// //Args - none
-// //Return : 
-// //  SEMID (Integer) - Success, returns a semaphore descriptor(SEMID)
-// //  -1	Process has reached its limit of resources
-// //  -2	Number of semaphores has reached its maximum
-
-// if(syscallNum == 17) then
-
-//     // MODE
-//     [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 17;
-//     alias resourceTable R6;
-//     resourceTable = [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512 + 496;
-
-//     //FREE ENTRY in PER PROCESS RESOURCE TABLE
-//     alias cnt R7;
-//     cnt = 0;
-//     while(cnt < 8) do
-//         if( [resourceTable + cnt*2] == -1 ) then
-//             goto continue1;
-//         endif;
-//         cnt = cnt + 1;
-//     endwhile;
-
-//     //no free entry in PER PROCESS RESOURCE TABLE
-//     [([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512)] = -1;
-
-//     continue1 :
-//     alias semDesc R8;
-//     semDesc = cnt;
-//     [resourceTable + semDesc*2] = 1;
-
-
-//     // CALL ACQUIRE_SEMAPHORE, RESOURCE MANAGER 0
-//     R1 = 6;
-//     R2 = [SYSTEM_STATUS_TABLE+1];
-//     multipush(R5, R6, R7, R8);
-//     call MOD_0;
-//     multipop(R5, R6, R7, R8);
-
-//     //no free semaphores (SEMAPHORE table)
-//     if(R0 == -1) then
-//         [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -2;
-//         goto end;
-//     endif;
-
-//     alias semID R9;
-//     semID = R0;
-
-
-//     //Attach the semaphore to the process (resource table)
-//     [resourceTable + semDesc*2 + 1] = semID;
-
-//     //return semDescriptor
-//     [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = semDesc;
-
-//     goto end;
-// endif;
-
-
-
-// //---SEMRELEASE SYSTEM CALL
-// //Args - Semaphore Descriptor (Integer)
-// //Return : 
-// //  0	Success
-// //  -1	Semaphore Descriptor is invalid
-
-// if(syscallNum == 18) then
-
-//     // MODE
-//     [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 18;
-
-//     alias semDesc R6;
-//     semDesc = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
-
-//     alias resourceTable R7;
-//     resourceTable = [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512 + 496;
-
-//     //  invalid if not in the range 0 - 7, or if the resource identifier field of the table entry is not 1
-//     if([resourceTable + 2*semDesc] != 1 || semDesc > 7 || semDesc<0) then
-//         [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
-//         goto end;
-//     endif;
-    
-//     // CALL RELEASE_SEMAPHORE, RESOURCE MANAGER 0
-//     R1 = 7;
-//     R2 = [resourceTable + 2*semDesc + 1];
-//     R3 = [SYSTEM_STATUS_TABLE+1];
-//     multipush(R5, R6, R7);
-//     call MOD_0;
-//     multipop(R5, R6, R7);
-
-//     [resourceTable + 2*semDesc] = -1;
-
-//     [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = 0;    
-//     goto end;
-// endif;
-
-
-
-
-
-// end :
-// //switch stack, mode
-// SP = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13]; 
-// [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
-
-// ireturn;
-
-
-
-
-//------- SEMGET, SEMRELEASE --------------------------------------------
-
-// ------  Extract Syscall Number from User stack (userSP - 5, will have it, as userSP-4 will have args for the Syscall) -------------
-alias SysCallNum R1;
-alias userSP R2;
+alias syscallNum R15;
+syscallNum = [([PTBR + 2 * ((SP - 5) / 512)] * 512) + ((SP - 5) % 512)];
+alias userSP R5;
 userSP = SP;
-SysCallNum = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 5)/ 512] * 512 + ((userSP - 5) % 512)];
 
-//---- Switch Stack --------------------------------------------------------------------------------------------
-[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+13] = SP;
-SP = [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512-1;
+//--Switch Stack
+//save user SP, set SP to KPTR
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP;
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1;
 
 
-// ------ SYSCALLS: SEMGET(Syscall 17) AND SEMRELEASE(Syscall 18) -------------------
-//------- SEMGET (17) -----------------------------------
-// Arg: None
-if(SysCallNum == 17) then
-    //---- Mode Flag -----
-    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 17;
+//---SEMGET SYSTEM CALL
+//Args - none
+//Return : 
+//  SEMID (Integer) - Success, returns a semaphore descriptor(SEMID)
+//  -1	Process has reached its limit of resources
+//  -2	Number of semaphores has reached its maximum
 
-    //---- Loop Per Process Resource Table to find free space (if not return -1)---------
-    alias cnt R3;
+if(syscallNum == 17) then
+
+    // MODE
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 17;
+    alias resourceTable R6;
+    resourceTable = [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512 + 496;
+
+    //FREE ENTRY in PER PROCESS RESOURCE TABLE
+    alias cnt R7;
     cnt = 0;
-    while( cnt < 8 ) do
-        if([[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 + 496 + cnt*2] == -1) then
-
-            // Mark as Semaphore in Resource Identifier in Per Process Table
-            [[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 + 496 + cnt*2] = 1;
-
-            // Call Acquire Semaphore (Resource Manager, funNum = 6)
-            // Args: PID
-            multipush(R1, R2, R3);
-                R1 = 6;
-                R2 = [SYSTEM_STATUS_TABLE + 1];
-                call MOD_0;
-            multipop(R1, R2, R3);
-
-            // No free Semaphores, => return -2
-            if(R0 == -1) then
-                alias physicalAddrRetVal R4;
-                physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
-                [physicalAddrRetVal] = -2;
-                // Mode Flag and Returning
-                [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
-                SP = userSP;
-                ireturn;
-            endif;
-
-            // Attach Semaphore to Process: Store returned index in Semaphore table into the Per Process Resource Table
-            [[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 + 496 + cnt*2 + 1] = R0;
-            
-            // Store Return value of Per Process Resource Table Index : Semaphore Descriptor (SEMID)
-            alias physicalAddrRetVal R4;
-            physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
-            [physicalAddrRetVal] = cnt;
-
-            // Mode Flag and Returning
-            [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
-            SP = userSP;
-            ireturn;
+    while(cnt < 8) do
+        if( [resourceTable + cnt*2] == -1 ) then
+            goto continue1;
         endif;
         cnt = cnt + 1;
-
     endwhile;
-    // No Space in Per Process Resource Table, => return -1
-    alias physicalAddrRetVal R4;
-    physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
-    [physicalAddrRetVal] = -1;
 
-    // Mode Flag and Returning
-    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
-    SP = userSP;
-    ireturn;
+    //no free entry in PER PROCESS RESOURCE TABLE
+    [([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512)] = -1;
 
-endif;
+    continue1 :
+    alias semDesc R8;
+    semDesc = cnt;
+    [resourceTable + semDesc*2] = 1;
 
 
-//------- SEMRELEASE(18) -----------------------------------
-// Arg: SEMID of Semaphore to Release
-if(SysCallNum == 18) then
-    //---- Mode Flag -----
-    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 18; 
-
-    // Get the SEMID from Args
-    alias SEMID R3;
-    SEMID = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 4)/ 512] * 512 + ((userSP - 4) % 512)];
-
-    //---- Validity of SEMID: Range of SEMID not in (0-7) -----
-    //---- OR Resource Identifier field in Per Process not 1 -----
-    if( SEMID < 0 || SEMID > 7 || [[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 + 496 + 2*SEMID] != 1) then 
-        // Mode Flag and Returning
-        [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
-        SP = userSP;
-        // Return -1
-        alias physicalAddrRetVal R4;
-        physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
-        [physicalAddrRetVal] = -1;
-        ireturn; 
-    endif;
-    //---- Call Release Semaphore (Resource Manager, funNum = 7) -----
-    // Args: SEM_TABLE_INDEX, PID
-    multipush(R1, R2, R3);
-    R1 = 7;
-    R2 = [[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 + 496 + 2*SEMID + 1];
-    R3 = [SYSTEM_STATUS_TABLE + 1];
+    // CALL ACQUIRE_SEMAPHORE, RESOURCE MANAGER 0
+    R1 = 6;
+    R2 = [SYSTEM_STATUS_TABLE+1];
+    multipush(R5, R6, R7, R8);
     call MOD_0;
-    multipop(R1, R2, R3);
-    //---- Invalidate the PerProcess Resource Table Entry ----
-    [[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 + 496 + 2*SEMID] = -1;
+    multipop(R5, R6, R7, R8);
 
-    // Mode Flag and Returning
-    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
-    SP = userSP;
+    //no free semaphores (SEMAPHORE table)
+    if(R0 == -1) then
+        [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -2;
+        goto end;
+    endif;
 
-    // Return 0
-    alias physicalAddrRetVal R4;
-    physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
-    [physicalAddrRetVal] = 0;
-    ireturn; 
+    alias semID R9;
+    semID = R0;
 
+
+    //Attach the semaphore to the process (resource table)
+    [resourceTable + semDesc*2 + 1] = semID;
+
+    //return semDescriptor
+    [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = semDesc;
+
+    goto end;
 endif;
 
-//------ Change back to userSP ----------------------------
-SP = userSP;
-ireturn; 
+
+
+//---SEMRELEASE SYSTEM CALL
+//Args - Semaphore Descriptor (Integer)
+//Return : 
+//  0	Success
+//  -1	Semaphore Descriptor is invalid
+
+if(syscallNum == 18) then
+
+    // MODE
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 18;
+
+    alias semDesc R6;
+    semDesc = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
+
+    alias resourceTable R7;
+    resourceTable = [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512 + 496;
+
+    //  invalid if not in the range 0 - 7, or if the resource identifier field of the table entry is not 1
+    if([resourceTable + 2*semDesc] != 1 || semDesc > 7 || semDesc<0) then
+        [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
+        goto end;
+    endif;
+    
+    // CALL RELEASE_SEMAPHORE, RESOURCE MANAGER 0
+    R1 = 7;
+    R2 = [resourceTable + 2*semDesc + 1];
+    R3 = [SYSTEM_STATUS_TABLE+1];
+    multipush(R5, R6, R7);
+    call MOD_0;
+    multipop(R5, R6, R7);
+
+    [resourceTable + 2*semDesc] = -1;
+
+    [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = 0;    
+    goto end;
+endif;
+
+
+
+
+
+end :
+//switch stack, mode
+SP = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13]; 
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
+
+ireturn;
+
+
+
+
+// //------- SEMGET, SEMRELEASE --------------------------------------------
+
+// // ------  Extract Syscall Number from User stack (userSP - 5, will have it, as userSP-4 will have args for the Syscall) -------------
+// alias SysCallNum R1;
+// alias userSP R2;
+// userSP = SP;
+// SysCallNum = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 5)/ 512] * 512 + ((userSP - 5) % 512)];
+
+// //---- Switch Stack --------------------------------------------------------------------------------------------
+// [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+13] = SP;
+// SP = [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512-1;
+
+
+// // ------ SYSCALLS: SEMGET(Syscall 17) AND SEMRELEASE(Syscall 18) -------------------
+// //------- SEMGET (17) -----------------------------------
+// // Arg: None
+// if(SysCallNum == 17) then
+//     //---- Mode Flag -----
+//     [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 17;
+
+//     //---- Loop Per Process Resource Table to find free space (if not return -1)---------
+//     alias cnt R3;
+//     cnt = 0;
+//     while( cnt < 8 ) do
+//         if([[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 + 496 + cnt*2] == -1) then
+
+//             // Mark as Semaphore in Resource Identifier in Per Process Table
+//             [[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 + 496 + cnt*2] = 1;
+
+//             // Call Acquire Semaphore (Resource Manager, funNum = 6)
+//             // Args: PID
+//             multipush(R1, R2, R3);
+//                 R1 = 6;
+//                 R2 = [SYSTEM_STATUS_TABLE + 1];
+//                 call MOD_0;
+//             multipop(R1, R2, R3);
+
+//             // No free Semaphores, => return -2
+//             if(R0 == -1) then
+//                 alias physicalAddrRetVal R4;
+//                 physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
+//                 [physicalAddrRetVal] = -2;
+//                 // Mode Flag and Returning
+//                 [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+//                 SP = userSP;
+//                 ireturn;
+//             endif;
+
+//             // Attach Semaphore to Process: Store returned index in Semaphore table into the Per Process Resource Table
+//             [[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 + 496 + cnt*2 + 1] = R0;
+            
+//             // Store Return value of Per Process Resource Table Index : Semaphore Descriptor (SEMID)
+//             alias physicalAddrRetVal R4;
+//             physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
+//             [physicalAddrRetVal] = cnt;
+
+//             // Mode Flag and Returning
+//             [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+//             SP = userSP;
+//             ireturn;
+//         endif;
+//         cnt = cnt + 1;
+
+//     endwhile;
+//     // No Space in Per Process Resource Table, => return -1
+//     alias physicalAddrRetVal R4;
+//     physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
+//     [physicalAddrRetVal] = -1;
+
+//     // Mode Flag and Returning
+//     [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+//     SP = userSP;
+//     ireturn;
+
+// endif;
+
+
+// //------- SEMRELEASE(18) -----------------------------------
+// // Arg: SEMID of Semaphore to Release
+// if(SysCallNum == 18) then
+//     //---- Mode Flag -----
+//     [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 18; 
+
+//     // Get the SEMID from Args
+//     alias SEMID R3;
+//     SEMID = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 4)/ 512] * 512 + ((userSP - 4) % 512)];
+
+//     //---- Validity of SEMID: Range of SEMID not in (0-7) -----
+//     //---- OR Resource Identifier field in Per Process not 1 -----
+//     if( SEMID < 0 || SEMID > 7 || [[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 + 496 + 2*SEMID] != 1) then 
+//         // Mode Flag and Returning
+//         [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+//         SP = userSP;
+//         // Return -1
+//         alias physicalAddrRetVal R4;
+//         physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
+//         [physicalAddrRetVal] = -1;
+//         ireturn; 
+//     endif;
+//     //---- Call Release Semaphore (Resource Manager, funNum = 7) -----
+//     // Args: SEM_TABLE_INDEX, PID
+//     multipush(R1, R2, R3);
+//     R1 = 7;
+//     R2 = [[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 + 496 + 2*SEMID + 1];
+//     R3 = [SYSTEM_STATUS_TABLE + 1];
+//     call MOD_0;
+//     multipop(R1, R2, R3);
+//     //---- Invalidate the PerProcess Resource Table Entry ----
+//     [[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 + 496 + 2*SEMID] = -1;
+
+//     // Mode Flag and Returning
+//     [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+//     SP = userSP;
+
+//     // Return 0
+//     alias physicalAddrRetVal R4;
+//     physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
+//     [physicalAddrRetVal] = 0;
+//     ireturn; 
+
+// endif;
+
+// //------ Change back to userSP ----------------------------
+// SP = userSP;
+// ireturn; 

@@ -1,193 +1,193 @@
 
-// //---- SYSTEM CALLS :
-// //11. GET PID SYSTEM CALL
-// //12. GET PPID SYSTEM CALL
-// //13. WAIT SYSTEM CALL
-// //14. SIGNAL SYSTEM CALL
+//---- SYSTEM CALLS :
+//11. GET PID SYSTEM CALL
+//12. GET PPID SYSTEM CALL
+//13. WAIT SYSTEM CALL
+//14. SIGNAL SYSTEM CALL
 
-// alias syscallNum R15;
-// syscallNum = [([PTBR + 2 * ((SP - 5) / 512)] * 512) + ((SP - 5) % 512)];
+alias syscallNum R15;
+syscallNum = [([PTBR + 2 * ((SP - 5) / 512)] * 512) + ((SP - 5) % 512)];
 
-// alias userSP R14;
-// userSP = SP;
-
-// //--Switch Stack
-// //save user SP, set SP to KPTR
-// [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP;
-// SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1;
-
-
-// //---GET PID SYSTEM CALL
-// //Args - none
-// //Return : current PID
-// if(syscallNum == 11) then
-//     [([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512)] = [SYSTEM_STATUS_TABLE+1];
-//     goto end;
-// endif;
-
-
-// //---GET PPID SYSTEM CALL
-// //Args - none
-// //Return : parent PID
-// if(syscallNum == 12) then
-//     [([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512)] = [PROCESS_TABLE + 16*[SYSTEM_STATUS_TABLE+1] + 2];
-//     goto end;
-// endif;
-
-
-
-// //---WAIT SYSTEM CALL
-// //Args - PID
-// //Return : 0 - Success , -1 - Given PID is invalid or it is PID of invoking process
-// if(syscallNum == 13) then
-//     [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 13;
-//     alias wPID R15;
-//     wPID = [([PTBR + 2 * ((userSP - 4) / 512)] * 512) + ((userSP - 4) % 512)];
-
-//     //CHECK wPID : 1.PID if of current process itself 2. valid range 3. TERMINATED process 
-//     if( wPID == [SYSTEM_STATUS_TABLE+1] || wPID>15 || wPID<0 || [PROCESS_TABLE + 16*wPID + 4] == TERMINATED ) then
-//         [([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512)] = -1;
-//         goto end;
-//     endif;
-
-//     [PROCESS_TABLE + 16*[SYSTEM_STATUS_TABLE+1] + 4] = WAIT_PROCESS;
-//     [PROCESS_TABLE + 16*[SYSTEM_STATUS_TABLE+1] + 5] = wPID;
-//     //print "wait";print wPID;print[SYSTEM_STATUS_TABLE+1];
-//     call SCHEDULER;
-
-//     //The following step is executed only when the scheduler runs this process again
-//     //happens only when the state of the process becomes READY again
-//     [([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512)] = 0;
-//     goto end;    
-// endif;
-
-
-// //---SIGNAL SYSTEM CALL
-// //Args - none
-// //Return : 0 - Success
-// if(syscallNum == 14) then
-//     [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 14;
-//     alias cnt R13;
-//     cnt = 0;
-//     while( cnt < 16 ) do
-//         if( [PROCESS_TABLE + 16*cnt + 4] == WAIT_PROCESS &&  [PROCESS_TABLE + 16*cnt + 5] == [SYSTEM_STATUS_TABLE+1]) then
-//             [PROCESS_TABLE + 16*cnt + 4] = READY;
-//         endif ;
-//         cnt = cnt + 1;
-//     endwhile;
-//     [([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512)] = 0;
-//     goto end;
-// endif;
-
-
-
-// end :
-// //switch stack, mode
-// SP = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13]; 
-// [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
-
-// ireturn;
-
-
-
-
-
-//----- GetPID, GetPPID, Wait Syscall, Signal --------------------------------------------------------
-//---- Extract Syscall Number from User stack (userSP - 5, will have it, as userSP-4 will have args for the Syscall)------------
-alias SysCallNum R1;
-alias userSP R2;
+alias userSP R14;
 userSP = SP;
-SysCallNum = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 5)/ 512] * 512 + ((userSP - 5) % 512)];
 
-//---- Switch Stack --------------------------------------------------------------------------------------------
-[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+13] = SP;
-SP = [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512-1;
-
-//---- Syscalls ---------------------------------------------------------------------------------------------
-
-//---- GetPID Syscall (SyscallNum = 11) --------------------------------------------------
-if(SysCallNum == 11)
- then
- 	[[PTBR + 2 * ((userSP - 1)/ 512)]*512 + ((userSP - 1) % 512) ] = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 1];
- 	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
- 	SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13];	
- 	ireturn;
- endif;
+//--Switch Stack
+//save user SP, set SP to KPTR
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP;
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1;
 
 
-//---- GetPPID Syscall (SyscallNum = 12) -------------------------------------------------
- if(SysCallNum == 12)
- then
- 	[[PTBR + 2 * ((userSP - 1)/ 512)]*512 + ((userSP - 1) % 512) ] = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 2];
- 	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
- 	SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13];	
- 	ireturn;
- endif;
+//---GET PID SYSTEM CALL
+//Args - none
+//Return : current PID
+if(syscallNum == 11) then
+    [([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512)] = [SYSTEM_STATUS_TABLE+1];
+    goto end;
+endif;
 
 
-//---- Wait Syscall (SyscallNum = 13) ----------------------------------------------------
-if(SysCallNum == 13) then
-    //---- Mode Flag -----
-    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 13;
+//---GET PPID SYSTEM CALL
+//Args - none
+//Return : parent PID
+if(syscallNum == 12) then
+    [([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512)] = [PROCESS_TABLE + 16*[SYSTEM_STATUS_TABLE+1] + 2];
+    goto end;
+endif;
 
-    //---- Get PID Arg ----------------------------------------------------
-    alias PID R3;
-    PID = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 4)/ 512] * 512 + ((userSP - 4) % 512)];
 
-    //---- Invalid Range, Terminated Process, or Waiting for Itself --------
-    if([PROCESS_TABLE + PID*16 + 4] == TERMINATED || PID == [SYSTEM_STATUS_TABLE + 1] || PID < 1 || PID > 15) then
-        alias physicalAddrRetVal R4;
-        physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
-        [physicalAddrRetVal] = -1;
-        [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
-        SP = userSP;
-        ireturn; 
+
+//---WAIT SYSTEM CALL
+//Args - PID
+//Return : 0 - Success , -1 - Given PID is invalid or it is PID of invoking process
+if(syscallNum == 13) then
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 13;
+    alias wPID R15;
+    wPID = [([PTBR + 2 * ((userSP - 4) / 512)] * 512) + ((userSP - 4) % 512)];
+
+    //CHECK wPID : 1.PID if of current process itself 2. valid range 3. TERMINATED process 
+    if( wPID == [SYSTEM_STATUS_TABLE+1] || wPID>15 || wPID<0 || [PROCESS_TABLE + 16*wPID + 4] == TERMINATED ) then
+        [([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512)] = -1;
+        goto end;
     endif;
 
-    //---- PID is Valid -------------------------------------------------------------
+    [PROCESS_TABLE + 16*[SYSTEM_STATUS_TABLE+1] + 4] = WAIT_PROCESS;
+    [PROCESS_TABLE + 16*[SYSTEM_STATUS_TABLE+1] + 5] = wPID;
+    //print "wait";print wPID;print[SYSTEM_STATUS_TABLE+1];
+    call SCHEDULER;
 
-    //---- Change State of Current Process, WAITING for PID func to Signal/Terminate -----------
-    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 4] = WAIT_PROCESS;
-    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 5] = PID;
-    
-    //---- Scheduler ------------------------
-    multipush(R1,R2,R3,R4);
-    call MOD_5;
-    multipop(R1,R2,R3,R4);
-
-    //---- Executed only after READY state is achieved --------------
-
-    //---- Mode Flag and returning with 0 ------
-    alias physicalAddrRetVal R4;
-    physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
-    [physicalAddrRetVal] = 0;
-    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
-    SP = userSP;
-    ireturn;
-
+    //The following step is executed only when the scheduler runs this process again
+    //happens only when the state of the process becomes READY again
+    [([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512)] = 0;
+    goto end;    
 endif;
 
 
-//---- Signal Syscall (SyscallNum = 14) ------------------------------------------------------------
-if(SysCallNum == 14) then
-    //---- Mode Flag -----
-    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 14;
-    alias cnt R3;
+//---SIGNAL SYSTEM CALL
+//Args - none
+//Return : 0 - Success
+if(syscallNum == 14) then
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 14;
+    alias cnt R13;
     cnt = 0;
-    while(cnt < 16) do
-        if([PROCESS_TABLE + cnt*16 + 4] == WAIT_PROCESS &&  [PROCESS_TABLE + cnt*16 + 5] == [SYSTEM_STATUS_TABLE + 1]) then
-            [PROCESS_TABLE + cnt*16 + 4] = READY;
-        endif;
+    while( cnt < 16 ) do
+        if( [PROCESS_TABLE + 16*cnt + 4] == WAIT_PROCESS &&  [PROCESS_TABLE + 16*cnt + 5] == [SYSTEM_STATUS_TABLE+1]) then
+            [PROCESS_TABLE + 16*cnt + 4] = READY;
+        endif ;
+        cnt = cnt + 1;
     endwhile;
-    alias physicalAddrRetVal R4;
-    physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
-    [physicalAddrRetVal] = 0;
-    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
-    SP = userSP;
-    ireturn;
+    [([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512)] = 0;
+    goto end;
 endif;
 
-//------ Change back to userSP ----------------------------
-SP = userSP;
-ireturn; 
+
+
+end :
+//switch stack, mode
+SP = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13]; 
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
+
+ireturn;
+
+
+
+
+
+// //----- GetPID, GetPPID, Wait Syscall, Signal --------------------------------------------------------
+// //---- Extract Syscall Number from User stack (userSP - 5, will have it, as userSP-4 will have args for the Syscall)------------
+// alias SysCallNum R1;
+// alias userSP R2;
+// userSP = SP;
+// SysCallNum = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 5)/ 512] * 512 + ((userSP - 5) % 512)];
+
+// //---- Switch Stack --------------------------------------------------------------------------------------------
+// [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+13] = SP;
+// SP = [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512-1;
+
+// //---- Syscalls ---------------------------------------------------------------------------------------------
+
+// //---- GetPID Syscall (SyscallNum = 11) --------------------------------------------------
+// if(SysCallNum == 11)
+//  then
+//  	[[PTBR + 2 * ((userSP - 1)/ 512)]*512 + ((userSP - 1) % 512) ] = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 1];
+//  	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+//  	SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13];	
+//  	ireturn;
+//  endif;
+
+
+// //---- GetPPID Syscall (SyscallNum = 12) -------------------------------------------------
+//  if(SysCallNum == 12)
+//  then
+//  	[[PTBR + 2 * ((userSP - 1)/ 512)]*512 + ((userSP - 1) % 512) ] = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 2];
+//  	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+//  	SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13];	
+//  	ireturn;
+//  endif;
+
+
+// //---- Wait Syscall (SyscallNum = 13) ----------------------------------------------------
+// if(SysCallNum == 13) then
+//     //---- Mode Flag -----
+//     [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 13;
+
+//     //---- Get PID Arg ----------------------------------------------------
+//     alias PID R3;
+//     PID = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 4)/ 512] * 512 + ((userSP - 4) % 512)];
+
+//     //---- Invalid Range, Terminated Process, or Waiting for Itself --------
+//     if([PROCESS_TABLE + PID*16 + 4] == TERMINATED || PID == [SYSTEM_STATUS_TABLE + 1] || PID < 1 || PID > 15) then
+//         alias physicalAddrRetVal R4;
+//         physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
+//         [physicalAddrRetVal] = -1;
+//         [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+//         SP = userSP;
+//         ireturn; 
+//     endif;
+
+//     //---- PID is Valid -------------------------------------------------------------
+
+//     //---- Change State of Current Process, WAITING for PID func to Signal/Terminate -----------
+//     [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 4] = WAIT_PROCESS;
+//     [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 5] = PID;
+    
+//     //---- Scheduler ------------------------
+//     multipush(R1,R2,R3,R4);
+//     call MOD_5;
+//     multipop(R1,R2,R3,R4);
+
+//     //---- Executed only after READY state is achieved --------------
+
+//     //---- Mode Flag and returning with 0 ------
+//     alias physicalAddrRetVal R4;
+//     physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
+//     [physicalAddrRetVal] = 0;
+//     [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+//     SP = userSP;
+//     ireturn;
+
+// endif;
+
+
+// //---- Signal Syscall (SyscallNum = 14) ------------------------------------------------------------
+// if(SysCallNum == 14) then
+//     //---- Mode Flag -----
+//     [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 14;
+//     alias cnt R3;
+//     cnt = 0;
+//     while(cnt < 16) do
+//         if([PROCESS_TABLE + cnt*16 + 4] == WAIT_PROCESS &&  [PROCESS_TABLE + cnt*16 + 5] == [SYSTEM_STATUS_TABLE + 1]) then
+//             [PROCESS_TABLE + cnt*16 + 4] = READY;
+//         endif;
+//     endwhile;
+//     alias physicalAddrRetVal R4;
+//     physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
+//     [physicalAddrRetVal] = 0;
+//     [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+//     SP = userSP;
+//     ireturn;
+// endif;
+
+// //------ Change back to userSP ----------------------------
+// SP = userSP;
+// ireturn; 
 

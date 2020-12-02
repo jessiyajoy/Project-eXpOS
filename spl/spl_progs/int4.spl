@@ -1,254 +1,16 @@
-// //---- SYSTEM CALLS :
+//---- SYSTEM CALLS :
 
-// //1. CREATE SYSTEM CALL
-// //4. DELETE SYSTEM CALL
-
-
-// // Syscall Number from User stack 
-// alias SysCallNum R1;
-// alias userSP R2;
-// userSP = SP;
-// SysCallNum = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 5)/ 512] * 512 + ((userSP - 5) % 512)];
-
-// //Switch Stack
-// [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+13] = SP;
-// SP = [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512-1;
-
-// alias fileName R3;
-// fileName = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 4)/ 512] * 512 + ((userSP - 4) % 512)];
-// alias physicalAddrRetVal R5;
-// physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
-// alias processTableEntry R10;
-// processTableEntry = PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16;
+//1. CREATE SYSTEM CALL
+//4. DELETE SYSTEM CALL
 
 
-// //CREATE 
-// // Args:
-// // filename, permission
-// if(SysCallNum == 1) then
-//     // Mode Flag 
-//     [processTableEntry + 9] = 1;
-
-//     // filename and permissions
-//     alias permissions R4;
-//     permissions = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 3)/ 512] * 512 + ((userSP - 3) % 512)];
-
-//     //Search Inode Table If file Already Exist
-//     alias i R6;
-//     i = 0;
-//     while( i < 60 ) do
-//         if([INODE_TABLE + i*16 + 1] == fileName) then
-//             // return 0, do nothing
-//             [physicalAddrRetVal] = 0;
-//             [processTableEntry + 9] = 0;
-//             SP = userSP;
-//             ireturn;
-//         endif;
-//         i = i + 1;
-//     endwhile;
-
-//     // File is Not already Present
-//     //Find index of free entry in Inode Table, use Filename Field (-1)
-//     i = 0;
-//     while ( i < 60) do 
-//         if([INODE_TABLE + i*16 + 1] == -1) then
-//             break;
-//         endif;
-//         i = i + 1;
-//     endwhile;
-//     if( i == 60 ) then
-//         // No free space in Inode Table
-//         // return -1
-//         [physicalAddrRetVal] = -1;
-//         [processTableEntry + 9] = 0;
-//         SP = userSP;
-//         ireturn;
-//     endif;
-
-//     // free space found at the i-th index
-
-//     //Set Up the Inode Table Entry
-//     alias inodeEntry R8;
-//     inodeEntry = INODE_TABLE + i*16;
-//     [inodeEntry + 0] = DATA;       // file type
-//     [inodeEntry+ 1] = fileName;   // file name
-//     [inodeEntry+ 2] = 0;          // file size
-//     // Set Data Blocks to -1  (No disk blocks allocated to this file)
-//     alias cnt R7;
-//     cnt = 8;
-//     while(cnt<12) do
-//         [inodeEntry+ cnt] = -1;    // data blocks to -1
-//         cnt = cnt + 1;
-//     endwhile;
-//     [inodeEntry+ 3] = [processTableEntry + 3];  // User Id Field
-//     [inodeEntry+ 4] = permissions; // permission
-
-//     // Set Up the Root File Entry
-//     alias rootEntry R9;
-//     rootEntry = ROOT_FILE + i*8;
-//     [rootEntry + 0] = fileName;   // file name
-//     [rootEntry + 1] = 0;          // file size
-//     [rootEntry + 2] = DATA;       // file type
-//     // User Name from USER TABLE
-//     [rootEntry + 3] = [USER_TABLE + [processTableEntry + 3]*2];
-//     [rootEntry + 4] = permissions; // permission
-
-//     //Return 0
-//     [physicalAddrRetVal] = 0;
-//     [processTableEntry + 9] = 0;
-//     SP = userSP;
-//     ireturn;
-
-// endif;
-
-
-// //DELETE
-// // Args:
-// // filename
-// if( SysCallNum == 4) then
-//     // Mode Flag
-//     [processTableEntry + 9] = 4;
-
-//     //Find Index of File in INODE TABLE
-//     alias i R4;
-//     i = 0;
-//     while ( i < 60 ) do
-//         if([INODE_TABLE + i*16 + 1] == fileName) then
-//             break;
-//         endif;
-//         i = i + 1;
-//     endwhile;
-//     if( i == 60 ) then
-//         // If file not Present, return 0, success, already deleted
-//         [physicalAddrRetVal] = 0;
-//         [processTableEntry + 9] = 0;
-//         SP = userSP;
-//         ireturn;
-//     endif;
-//     if( [INODE_TABLE + i*16 + 0] != DATA ) then
-//         // If file type not equal to DATA, return -1
-//         [physicalAddrRetVal] = -1;
-//         [processTableEntry + 9] = 0;
-//         SP = userSP;
-//         ireturn;
-//     endif;
-
-//     alias inodeEntry R9;
-//     inodeEntry = INODE_TABLE + i*16;
-
-//     // If the exclusive permission is set
-//     // 	if the current user is not root and the current user does not own the file
-//     // 		return -1. 
-//     if( [inodeEntry + 4] == EXCLUSIVE) then
-//         if( ([processTableEntry + 3] != 1) && [inodeEntry + 3] != [processTableEntry + 3]) then
-//             // return -1
-//             [physicalAddrRetVal] = -1;
-//             [processTableEntry + 9] = 0;
-//             SP = userSP;
-//             ireturn;  
-//         endif;
-//     endif;
-//     // Acquire a Lock on File by calling the acquire_inode() in Resource Manager
-//     // args: funNum(4), inode_index, PID
-//     multipush(R1,R2,R3,R4,R5);
-//         R1 = 4;
-//         R2 = i;
-//         R3 = [SYSTEM_STATUS_TABLE + 1];
-//         call MOD_0;
-//     multipop(R1,R2,R3,R4,R5);
-
-
-//     // Check FILE STATUS TABLE and see if File Open Count == -1
-//     // Checkinf if there are any open instances of the File (if so then return -2 , /* File is open, cannot be deleted */)
-//     if([FILE_STATUS_TABLE + i*4 + 1] != -1) then
-//         // Release the lock (calling release_inode() in Resource Manager)
-//         // args: funNum(5), inode_index, PID
-//         multipush(R1,R2,R3,R4,R5);
-//             R1 = 5;
-//             R2 = i;
-//             R3 = [SYSTEM_STATUS_TABLE + 1];
-//             call MOD_0;
-//         multipop(R1,R2,R3,R4,R5);
-//         // return -2
-//         [physicalAddrRetVal] = -2;
-//         [processTableEntry + 9] = 0;
-//         SP = userSP;
-//         ireturn;  
-//     endif;
-
-//     alias cnt R6;
-//     cnt = 8;
-//     // For each Disk Block allocated (being used (not -1)) to the file 
-//     alias DiskBlockNum R8;
-//     while ( cnt < 12 ) do
-//         DiskBlockNum = [inodeEntry + cnt];
-//         if ( DiskBlockNum != -1 ) then
-//             // If the disk block is loaded into a buffer, 
-//             // and the DIRTY BIT is set, Then Reset the DIRTY BIT. 
-
-//             // buffer number in BUFFER TABLE is given by (Disk Block Number % MAX_BUFFER)
-//             alias bufferNumber R7;
-//             bufferNumber = DiskBlockNum % MAX_BUFFER;
-//             // If disk block is loaded into buffer:
-//             // checking the DIRTY BIT Field
-//             if( [BUFFER_TABLE + bufferNumber*4 + 0] == DiskBlockNum && [BUFFER_TABLE + bufferNumber*4 + 1] == 1) then
-//                 // Reset DIRTY BIT
-//                 [BUFFER_TABLE + bufferNumber*4 + 1] = 0;
-//             endif;
-//             // Call Release Block to free this Disk Block
-//             // args: funNum(4), Block Number, PID
-//             multipush(R1,R2,R3,R4,R5,R6,R7,R8);
-//                 R1 = 4;
-//                 R2 = DiskBlockNum;
-//                 R3 = [SYSTEM_STATUS_TABLE + 1];
-//                 call MOD_2;
-//             multipop(R1,R2,R3,R4,R5,R6,R7,R8);
-//         endif;
-//         cnt = cnt + 1;
-//     endwhile;
-
-//     //Invalidate the INODE TABLE for this file
-//     // Set Filename to -1
-//     [inodeEntry + 1] = -1;
-
-//     // Invalidate the ROOT FILE for this file 
-//     // Set Filename to -1
-//     [ROOT_FILE + i*8 + 0] = -1;
-
-//     // Release Lock by calling release_inode() in Resource Manager 
-//     // args: funNum(5), inode_index, PID
-//     multipush(R1,R2,R3,R4,R5);
-//         R1 = 5;
-//         R2 = i;
-//         R3 = [SYSTEM_STATUS_TABLE + 1];
-//         call MOD_0;
-//     multipop(R1,R2,R3,R4,R5);
-
-//     // Return 0 
-//     [physicalAddrRetVal] = 0;
-//     [processTableEntry + 9] = 0;
-//     SP = userSP;
-//     ireturn;
-
-// endif;
-
-// // Change back to userSP
-// SP = userSP;
-// ireturn; 
-
-
-
-// ---- FILE SYSCALLS: ---------- 
-// CREATE = 1
-// DELETE = 4
-
-//---- Extract Syscall Number from User stack (at userSP - 5)------------
+// Syscall Number from User stack 
 alias SysCallNum R1;
 alias userSP R2;
 userSP = SP;
 SysCallNum = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 5)/ 512] * 512 + ((userSP - 5) % 512)];
 
-//---- Switch Stack --------------------------------------------------------------------------------------------
+//Switch Stack
 [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+13] = SP;
 SP = [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512-1;
 
@@ -260,21 +22,18 @@ alias processTableEntry R10;
 processTableEntry = PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16;
 
 
-//---- Syscalls CREATE(syscallNum = 1) and DELETE(syscallNum = 4) (FILES)-------------------------------------------------------------
-
-//---- CREATE (Syscall Num = 1) ----------------------------------------------------
+//CREATE 
 // Args:
 // filename, permission
 if(SysCallNum == 1) then
-    //---- Mode Flag -----
+    // Mode Flag 
     [processTableEntry + 9] = 1;
 
-    //---- GET ARGS -----------
     // filename and permissions
     alias permissions R4;
     permissions = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 3)/ 512] * 512 + ((userSP - 3) % 512)];
 
-    //---- Search Inode Table If file Already Exist ---------------------------------
+    //Search Inode Table If file Already Exist
     alias i R6;
     i = 0;
     while( i < 60 ) do
@@ -289,7 +48,7 @@ if(SysCallNum == 1) then
     endwhile;
 
     // File is Not already Present
-    //---- Find index of free entry in Inode Table, use Filename Field (-1) ------
+    //Find index of free entry in Inode Table, use Filename Field (-1)
     i = 0;
     while ( i < 60) do 
         if([INODE_TABLE + i*16 + 1] == -1) then
@@ -308,7 +67,7 @@ if(SysCallNum == 1) then
 
     // free space found at the i-th index
 
-    //----- Set Up the Inode Table Entry --------------------------------------------
+    //Set Up the Inode Table Entry
     alias inodeEntry R8;
     inodeEntry = INODE_TABLE + i*16;
     [inodeEntry + 0] = DATA;       // file type
@@ -324,7 +83,7 @@ if(SysCallNum == 1) then
     [inodeEntry+ 3] = [processTableEntry + 3];  // User Id Field
     [inodeEntry+ 4] = permissions; // permission
 
-    //----- Set Up the Root File Entry --------------------------------------------
+    // Set Up the Root File Entry
     alias rootEntry R9;
     rootEntry = ROOT_FILE + i*8;
     [rootEntry + 0] = fileName;   // file name
@@ -334,7 +93,7 @@ if(SysCallNum == 1) then
     [rootEntry + 3] = [USER_TABLE + [processTableEntry + 3]*2];
     [rootEntry + 4] = permissions; // permission
 
-    // --- Return 0 -----------------
+    //Return 0
     [physicalAddrRetVal] = 0;
     [processTableEntry + 9] = 0;
     SP = userSP;
@@ -343,17 +102,14 @@ if(SysCallNum == 1) then
 endif;
 
 
-//---- DELETE (Syscall Num = 4) ----------------------------------------------------
+//DELETE
 // Args:
 // filename
 if( SysCallNum == 4) then
-    //---- Mode Flag -----
+    // Mode Flag
     [processTableEntry + 9] = 4;
 
-    //---- GET ARGS -----------
-    // filename (done above)
-
-    //---- Find Index of File in INODE TABLE --------
+    //Find Index of File in INODE TABLE
     alias i R4;
     i = 0;
     while ( i < 60 ) do
@@ -403,7 +159,7 @@ if( SysCallNum == 4) then
 
 
     // Check FILE STATUS TABLE and see if File Open Count == -1
-    // Checking if there are any open instances of the File (if so then return -2 , /* File is open, cannot be deleted */)
+    // Checkinf if there are any open instances of the File (if so then return -2 , /* File is open, cannot be deleted */)
     if([FILE_STATUS_TABLE + i*4 + 1] != -1) then
         // Release the lock (calling release_inode() in Resource Manager)
         // args: funNum(5), inode_index, PID
@@ -422,13 +178,14 @@ if( SysCallNum == 4) then
 
     alias cnt R6;
     cnt = 8;
-    // ----- For each Disk Block allocated (being used (not -1)) to the file do: -----------------------------------
+    // For each Disk Block allocated (being used (not -1)) to the file 
     alias DiskBlockNum R8;
     while ( cnt < 12 ) do
         DiskBlockNum = [inodeEntry + cnt];
         if ( DiskBlockNum != -1 ) then
             // If the disk block is loaded into a buffer, 
             // and the DIRTY BIT is set, Then Reset the DIRTY BIT. 
+
             // buffer number in BUFFER TABLE is given by (Disk Block Number % MAX_BUFFER)
             alias bufferNumber R7;
             bufferNumber = DiskBlockNum % MAX_BUFFER;
@@ -450,15 +207,15 @@ if( SysCallNum == 4) then
         cnt = cnt + 1;
     endwhile;
 
-    //------ Invalidate the INODE TABLE for this file ----------------------------------------------------------
+    //Invalidate the INODE TABLE for this file
     // Set Filename to -1
     [inodeEntry + 1] = -1;
 
-    //------ Invalidate the ROOT FILE for this file ----------------------------------------------------------
+    // Invalidate the ROOT FILE for this file 
     // Set Filename to -1
     [ROOT_FILE + i*8 + 0] = -1;
 
-    //----- Release Lock by calling release_inode() in Resource Manager -------------------------------------
+    // Release Lock by calling release_inode() in Resource Manager 
     // args: funNum(5), inode_index, PID
     multipush(R1,R2,R3,R4,R5);
         R1 = 5;
@@ -467,7 +224,7 @@ if( SysCallNum == 4) then
         call MOD_0;
     multipop(R1,R2,R3,R4,R5);
 
-    //----- Return 0 -----------------------------------------------------------------------------------------
+    // Return 0 
     [physicalAddrRetVal] = 0;
     [processTableEntry + 9] = 0;
     SP = userSP;
@@ -475,7 +232,250 @@ if( SysCallNum == 4) then
 
 endif;
 
-//------ Change back to userSP ---------------------------------------------------------------------------------
+// Change back to userSP
 SP = userSP;
 ireturn; 
+
+
+
+// // ---- FILE SYSCALLS: ---------- 
+// // CREATE = 1
+// // DELETE = 4
+
+// //---- Extract Syscall Number from User stack (at userSP - 5)------------
+// alias SysCallNum R1;
+// alias userSP R2;
+// userSP = SP;
+// SysCallNum = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 5)/ 512] * 512 + ((userSP - 5) % 512)];
+
+// //---- Switch Stack --------------------------------------------------------------------------------------------
+// [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+13] = SP;
+// SP = [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512-1;
+
+// alias fileName R3;
+// fileName = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 4)/ 512] * 512 + ((userSP - 4) % 512)];
+// alias physicalAddrRetVal R5;
+// physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
+// alias processTableEntry R10;
+// processTableEntry = PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16;
+
+
+// //---- Syscalls CREATE(syscallNum = 1) and DELETE(syscallNum = 4) (FILES)-------------------------------------------------------------
+
+// //---- CREATE (Syscall Num = 1) ----------------------------------------------------
+// // Args:
+// // filename, permission
+// if(SysCallNum == 1) then
+//     //---- Mode Flag -----
+//     [processTableEntry + 9] = 1;
+
+//     //---- GET ARGS -----------
+//     // filename and permissions
+//     alias permissions R4;
+//     permissions = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 3)/ 512] * 512 + ((userSP - 3) % 512)];
+
+//     //---- Search Inode Table If file Already Exist ---------------------------------
+//     alias i R6;
+//     i = 0;
+//     while( i < 60 ) do
+//         if([INODE_TABLE + i*16 + 1] == fileName) then
+//             // return 0, do nothing
+//             [physicalAddrRetVal] = 0;
+//             [processTableEntry + 9] = 0;
+//             SP = userSP;
+//             ireturn;
+//         endif;
+//         i = i + 1;
+//     endwhile;
+
+//     // File is Not already Present
+//     //---- Find index of free entry in Inode Table, use Filename Field (-1) ------
+//     i = 0;
+//     while ( i < 60) do 
+//         if([INODE_TABLE + i*16 + 1] == -1) then
+//             break;
+//         endif;
+//         i = i + 1;
+//     endwhile;
+//     if( i == 60 ) then
+//         // No free space in Inode Table
+//         // return -1
+//         [physicalAddrRetVal] = -1;
+//         [processTableEntry + 9] = 0;
+//         SP = userSP;
+//         ireturn;
+//     endif;
+
+//     // free space found at the i-th index
+
+//     //----- Set Up the Inode Table Entry --------------------------------------------
+//     alias inodeEntry R8;
+//     inodeEntry = INODE_TABLE + i*16;
+//     [inodeEntry + 0] = DATA;       // file type
+//     [inodeEntry+ 1] = fileName;   // file name
+//     [inodeEntry+ 2] = 0;          // file size
+//     // Set Data Blocks to -1  (No disk blocks allocated to this file)
+//     alias cnt R7;
+//     cnt = 8;
+//     while(cnt<12) do
+//         [inodeEntry+ cnt] = -1;    // data blocks to -1
+//         cnt = cnt + 1;
+//     endwhile;
+//     [inodeEntry+ 3] = [processTableEntry + 3];  // User Id Field
+//     [inodeEntry+ 4] = permissions; // permission
+
+//     //----- Set Up the Root File Entry --------------------------------------------
+//     alias rootEntry R9;
+//     rootEntry = ROOT_FILE + i*8;
+//     [rootEntry + 0] = fileName;   // file name
+//     [rootEntry + 1] = 0;          // file size
+//     [rootEntry + 2] = DATA;       // file type
+//     // User Name from USER TABLE
+//     [rootEntry + 3] = [USER_TABLE + [processTableEntry + 3]*2];
+//     [rootEntry + 4] = permissions; // permission
+
+//     // --- Return 0 -----------------
+//     [physicalAddrRetVal] = 0;
+//     [processTableEntry + 9] = 0;
+//     SP = userSP;
+//     ireturn;
+
+// endif;
+
+
+// //---- DELETE (Syscall Num = 4) ----------------------------------------------------
+// // Args:
+// // filename
+// if( SysCallNum == 4) then
+//     //---- Mode Flag -----
+//     [processTableEntry + 9] = 4;
+
+//     //---- GET ARGS -----------
+//     // filename (done above)
+
+//     //---- Find Index of File in INODE TABLE --------
+//     alias i R4;
+//     i = 0;
+//     while ( i < 60 ) do
+//         if([INODE_TABLE + i*16 + 1] == fileName) then
+//             break;
+//         endif;
+//         i = i + 1;
+//     endwhile;
+//     if( i == 60 ) then
+//         // If file not Present, return 0, success, already deleted
+//         [physicalAddrRetVal] = 0;
+//         [processTableEntry + 9] = 0;
+//         SP = userSP;
+//         ireturn;
+//     endif;
+//     if( [INODE_TABLE + i*16 + 0] != DATA ) then
+//         // If file type not equal to DATA, return -1
+//         [physicalAddrRetVal] = -1;
+//         [processTableEntry + 9] = 0;
+//         SP = userSP;
+//         ireturn;
+//     endif;
+
+//     alias inodeEntry R9;
+//     inodeEntry = INODE_TABLE + i*16;
+
+//     // If the exclusive permission is set
+//     // 	if the current user is not root and the current user does not own the file
+//     // 		return -1. 
+//     if( [inodeEntry + 4] == EXCLUSIVE) then
+//         if( ([processTableEntry + 3] != 1) && [inodeEntry + 3] != [processTableEntry + 3]) then
+//             // return -1
+//             [physicalAddrRetVal] = -1;
+//             [processTableEntry + 9] = 0;
+//             SP = userSP;
+//             ireturn;  
+//         endif;
+//     endif;
+//     // Acquire a Lock on File by calling the acquire_inode() in Resource Manager
+//     // args: funNum(4), inode_index, PID
+//     multipush(R1,R2,R3,R4,R5);
+//         R1 = 4;
+//         R2 = i;
+//         R3 = [SYSTEM_STATUS_TABLE + 1];
+//         call MOD_0;
+//     multipop(R1,R2,R3,R4,R5);
+
+
+//     // Check FILE STATUS TABLE and see if File Open Count == -1
+//     // Checking if there are any open instances of the File (if so then return -2 , /* File is open, cannot be deleted */)
+//     if([FILE_STATUS_TABLE + i*4 + 1] != -1) then
+//         // Release the lock (calling release_inode() in Resource Manager)
+//         // args: funNum(5), inode_index, PID
+//         multipush(R1,R2,R3,R4,R5);
+//             R1 = 5;
+//             R2 = i;
+//             R3 = [SYSTEM_STATUS_TABLE + 1];
+//             call MOD_0;
+//         multipop(R1,R2,R3,R4,R5);
+//         // return -2
+//         [physicalAddrRetVal] = -2;
+//         [processTableEntry + 9] = 0;
+//         SP = userSP;
+//         ireturn;  
+//     endif;
+
+//     alias cnt R6;
+//     cnt = 8;
+//     // ----- For each Disk Block allocated (being used (not -1)) to the file do: -----------------------------------
+//     alias DiskBlockNum R8;
+//     while ( cnt < 12 ) do
+//         DiskBlockNum = [inodeEntry + cnt];
+//         if ( DiskBlockNum != -1 ) then
+//             // If the disk block is loaded into a buffer, 
+//             // and the DIRTY BIT is set, Then Reset the DIRTY BIT. 
+//             // buffer number in BUFFER TABLE is given by (Disk Block Number % MAX_BUFFER)
+//             alias bufferNumber R7;
+//             bufferNumber = DiskBlockNum % MAX_BUFFER;
+//             // If disk block is loaded into buffer:
+//             // checking the DIRTY BIT Field
+//             if( [BUFFER_TABLE + bufferNumber*4 + 0] == DiskBlockNum && [BUFFER_TABLE + bufferNumber*4 + 1] == 1) then
+//                 // Reset DIRTY BIT
+//                 [BUFFER_TABLE + bufferNumber*4 + 1] = 0;
+//             endif;
+//             // Call Release Block to free this Disk Block
+//             // args: funNum(4), Block Number, PID
+//             multipush(R1,R2,R3,R4,R5,R6,R7,R8);
+//                 R1 = 4;
+//                 R2 = DiskBlockNum;
+//                 R3 = [SYSTEM_STATUS_TABLE + 1];
+//                 call MOD_2;
+//             multipop(R1,R2,R3,R4,R5,R6,R7,R8);
+//         endif;
+//         cnt = cnt + 1;
+//     endwhile;
+
+//     //------ Invalidate the INODE TABLE for this file ----------------------------------------------------------
+//     // Set Filename to -1
+//     [inodeEntry + 1] = -1;
+
+//     //------ Invalidate the ROOT FILE for this file ----------------------------------------------------------
+//     // Set Filename to -1
+//     [ROOT_FILE + i*8 + 0] = -1;
+
+//     //----- Release Lock by calling release_inode() in Resource Manager -------------------------------------
+//     // args: funNum(5), inode_index, PID
+//     multipush(R1,R2,R3,R4,R5);
+//         R1 = 5;
+//         R2 = i;
+//         R3 = [SYSTEM_STATUS_TABLE + 1];
+//         call MOD_0;
+//     multipop(R1,R2,R3,R4,R5);
+
+//     //----- Return 0 -----------------------------------------------------------------------------------------
+//     [physicalAddrRetVal] = 0;
+//     [processTableEntry + 9] = 0;
+//     SP = userSP;
+//     ireturn;
+
+// endif;
+
+// //------ Change back to userSP ---------------------------------------------------------------------------------
+// SP = userSP;
+// ireturn; 
 

@@ -1,248 +1,248 @@
 
-// //---- SYSTEM CALLS :
+//---- SYSTEM CALLS :
 
-// //19. SEMLOCK SYSTEM CALL
-// //20. SEMUNLOCK SYSTEM CALL
+//19. SEMLOCK SYSTEM CALL
+//20. SEMUNLOCK SYSTEM CALL
 
-// alias syscallNum R15;
-// syscallNum = [([PTBR + 2 * ((SP - 5) / 512)] * 512) + ((SP - 5) % 512)];
+alias syscallNum R15;
+syscallNum = [([PTBR + 2 * ((SP - 5) / 512)] * 512) + ((SP - 5) % 512)];
 
-// alias userSP R5;
-// userSP = SP;
-
-// //--Switch Stack
-// //save user SP, set SP to KPTR
-// [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP;
-// SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1;
-
-
-// //---SEMLOCK SYSTEM CALL
-// //Args - Semaphore Descriptor (Integer)
-// //Return : 
-// //  0	Success or the semaphore is already locked by the current process
-// // -1	Semaphore Descriptor is invalid
-
-// if(syscallNum == 19) then
-
-//     // MODE
-//     [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 19;
-
-//     alias semDesc R8;
-//     semDesc = [([PTBR + 2*((userSP-4)/512)]*512) + (userSP-4)%512];
-
-//     alias resourceTable R7;
-//     resourceTable = [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512 + 496;
-
-
-//     //  invalid if not in the range 0 - 7, or if the resource identifier field of the table entry is not 1
-//     if([resourceTable + 2*semDesc] != 1 || semDesc > 7 || semDesc<0) then
-//         [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
-//         goto end;
-//     endif;
-
-//     //while semaphore is locked by another process
-//     while( [SEMAPHORE_TABLE + 4*[resourceTable + 2*semDesc + 1] ] !=  -1) do
-//         [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 4] = WAIT_SEMAPHORE;
-//         [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 5] = [resourceTable + 2*semDesc + 1];
-
-//         multipush(R5, R7, R8);
-//         call MOD_5;
-//         multipop(R5, R7, R8);
-//     endwhile;
-
-//     // when semaphore becomes free for locking
-//     [SEMAPHORE_TABLE + 4*[resourceTable + 2*semDesc + 1] ] =  [SYSTEM_STATUS_TABLE+1];
-
-//     [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = 0;
-//     goto end;
-// endif;
-
-
-
-// //---SEMUNLOCK SYSTEM CALL
-// //Args - Semaphore Descriptor (Integer)
-// //Return : 
-// //  0	Success
-// // -1	Semaphore Descriptor is invalid
-// // -2	Semaphore was not locked by the calling process
-
-// if(syscallNum == 20) then
-
-//     // MODE
-//     [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 20;
-
-//     alias semDesc R8;
-//     semDesc = [([PTBR + 2*((userSP-4)/512)]*512) + (userSP-4)%512];
-
-//     alias resourceTable R6;
-//     resourceTable = [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512 + 496;
-
-//     //  invalid if not in the range 0 - 7, or if the resource identifier field of the table entry is not 1
-//     if([resourceTable + 2*semDesc] != 1 || semDesc > 7 || semDesc<0) then
-//         [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
-//         goto end;
-//     endif;
-
-//     //If semaphore is locked
-//     if( [SEMAPHORE_TABLE + 4*[resourceTable + 2*semDesc + 1] ] !=  -1 ) then
-//         // semaphore is locked by some other process
-//         if( [SEMAPHORE_TABLE + 4*[resourceTable + 2*semDesc + 1]] != [SYSTEM_STATUS_TABLE+1]) then
-//             [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -2;
-//             goto end;
-//         endif;
-
-//         // unlock semaphore
-//         [SEMAPHORE_TABLE + 4*[resourceTable + 2*semDesc + 1] ] = -1;
-
-//         //wake up processes blocked by the semaphore
-//         //(WAIT_SEMAPHORE, Semaphore table index of the locked semaphore) -> (READY, _ )
-//         alias cnt R7;
-//         cnt = 0;
-//         while ( cnt < 16) do
-//             if ([PROCESS_TABLE + cnt*16 + 4]==WAIT_SEMAPHORE && [PROCESS_TABLE + cnt*16 + 5]==[resourceTable + 2*semDesc + 1]) then
-//                 [PROCESS_TABLE + cnt*16 + 4]= READY;
-//             endif;
-//             cnt = cnt + 1;
-//         endwhile;
-//     endif ;
-
-
-//     [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = 0;    
-//     goto end;
-// endif;
-
-
-// end :
-// //switch stack, mode
-// SP = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13]; 
-// [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
-
-// ireturn;
-
-
-
-// ------- SEM LOCK, SEM UNLOCK ------------------------------------------------------------------------------------------------------//
-// ------  Extract Syscall Number from User stack (userSP - 5, will have it, as userSP-4 will have args for the Syscall) -------------
-alias SysCallNum R1;
-alias userSP R2;
+alias userSP R5;
 userSP = SP;
-SysCallNum = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 5)/ 512] * 512 + ((userSP - 5) % 512)];
 
-//---- Switch Stack --------------------------------------------------------------------------------------------
-[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+13] = SP;
-SP = [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512-1;
+//--Switch Stack
+//save user SP, set SP to KPTR
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP;
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1;
 
-// ------ SYSCALLS: SEMLOCK(Syscall 19) AND SEMUNLOCK(Syscall 20) -------------------
 
-//------- SEMLOCK (19) -----------------------------------
-// Arg: SEMID (Semaphore Descriptor, Index in Per Process Resource Table)
-if(SysCallNum == 19) then
-    alias SEMID R3;
-    SEMID = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 4)/ 512] * 512 + ((userSP - 4) % 512)];
-    alias SEM_TABLE_INDEX R4;
-    SEM_TABLE_INDEX = [[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11] * 512 + 496 + 2*SEMID + 1];
+//---SEMLOCK SYSTEM CALL
+//Args - Semaphore Descriptor (Integer)
+//Return : 
+//  0	Success or the semaphore is already locked by the current process
+// -1	Semaphore Descriptor is invalid
 
-    //---- Mode Flag -----
-    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 19;
+if(syscallNum == 19) then
 
-    //---- Validity of SEMID: Range of SEMID not in (0-7) -----
-    //---- OR Resource Identifier field in Per Process not 1 -----
-    if( SEMID < 0 || SEMID > 7 || [[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 + 496 + 2*SEMID] != 1) then 
-        // Mode Flag and Returning
-        [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
-        SP = userSP;
-        // Return -1
-        alias physicalAddrRetVal R5;
-        physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
-        [physicalAddrRetVal] = -1;
-        ireturn; 
+    // MODE
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 19;
+
+    alias semDesc R8;
+    semDesc = [([PTBR + 2*((userSP-4)/512)]*512) + (userSP-4)%512];
+
+    alias resourceTable R7;
+    resourceTable = [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512 + 496;
+
+
+    //  invalid if not in the range 0 - 7, or if the resource identifier field of the table entry is not 1
+    if([resourceTable + 2*semDesc] != 1 || semDesc > 7 || semDesc<0) then
+        [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
+        goto end;
     endif;
-    // BUSY WAIT FOR LOCKING SEMAPHORE
-    // Checking if it is Locked by Some Process then busy wait
-    while([SEMAPHORE_TABLE + SEM_TABLE_INDEX*4] != -1) do 
-        // WAITING FOR SEMAPHORE
-        [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 4] = WAIT_SEMAPHORE;
-        [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 5] = SEM_TABLE_INDEX;
-        // CALL SCHEDULER
-        multipush(R1,R2,R3,R4);
-        call MOD_5;
-        multipop(R1,R2,R3,R4);
-    endwhile;
-    
-    // Semaphore became Free, now Lock It
-    [SEMAPHORE_TABLE + SEM_TABLE_INDEX*4] = [SYSTEM_STATUS_TABLE + 1];
 
-    // Mode Flag and Returning
-    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
-    SP = userSP;
-    // Return 0
-    alias physicalAddrRetVal R5;
-    physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
-    [physicalAddrRetVal] = 0;
-    ireturn; 
+    //while semaphore is locked by another process
+    while( [SEMAPHORE_TABLE + 4*[resourceTable + 2*semDesc + 1] ] !=  -1) do
+        [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 4] = WAIT_SEMAPHORE;
+        [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 5] = [resourceTable + 2*semDesc + 1];
+
+        multipush(R5, R7, R8);
+        call MOD_5;
+        multipop(R5, R7, R8);
+    endwhile;
+
+    // when semaphore becomes free for locking
+    [SEMAPHORE_TABLE + 4*[resourceTable + 2*semDesc + 1] ] =  [SYSTEM_STATUS_TABLE+1];
+
+    [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = 0;
+    goto end;
 endif;
 
-//------- SEM_UNLOCK (20) -----------------------------------
-if(SysCallNum == 20) then
-    alias SEMID R3;
-    SEMID = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 4)/ 512] * 512 + ((userSP - 4) % 512)];
-    alias SEM_TABLE_INDEX R4;
-    SEM_TABLE_INDEX = [[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11] * 512 + 496 + 2*SEMID + 1];
 
-    //---- Mode Flag -----
-    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 20;
 
-    //---- Validity of SEMID: Range of SEMID not in (0-7) -----
-    //---- OR Resource Identifier field in Per Process not 1 -----
-    if( SEMID < 0 || SEMID > 7 || [[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 + 496 + 2*SEMID] != 1) then 
-        // Mode Flag and Returning
-        [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
-        SP = userSP;
-        // Return -1
-        alias physicalAddrRetVal R5;
-        physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
-        [physicalAddrRetVal] = -1;
-        ireturn;
+//---SEMUNLOCK SYSTEM CALL
+//Args - Semaphore Descriptor (Integer)
+//Return : 
+//  0	Success
+// -1	Semaphore Descriptor is invalid
+// -2	Semaphore was not locked by the calling process
+
+if(syscallNum == 20) then
+
+    // MODE
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 20;
+
+    alias semDesc R8;
+    semDesc = [([PTBR + 2*((userSP-4)/512)]*512) + (userSP-4)%512];
+
+    alias resourceTable R6;
+    resourceTable = [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512 + 496;
+
+    //  invalid if not in the range 0 - 7, or if the resource identifier field of the table entry is not 1
+    if([resourceTable + 2*semDesc] != 1 || semDesc > 7 || semDesc<0) then
+        [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
+        goto end;
     endif;
 
-    // If Semaphore is Locked
-    if([SEMAPHORE_TABLE + SEM_TABLE_INDEX*4] != -1) then
-        // If Semaphore was not Locked by the Current Process (may be some other process), do nothing return -2
-        if([SEMAPHORE_TABLE + SEM_TABLE_INDEX*4] != [SYSTEM_STATUS_TABLE + 1]) then
-            // Mode Flag and Returning
-            [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
-            SP = userSP;
-            // Return -2
-            alias physicalAddrRetVal R5;
-            physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
-            [physicalAddrRetVal] = -2;
-            ireturn;        
+    //If semaphore is locked
+    if( [SEMAPHORE_TABLE + 4*[resourceTable + 2*semDesc + 1] ] !=  -1 ) then
+        // semaphore is locked by some other process
+        if( [SEMAPHORE_TABLE + 4*[resourceTable + 2*semDesc + 1]] != [SYSTEM_STATUS_TABLE+1]) then
+            [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -2;
+            goto end;
         endif;
 
-        // Set Locking PID to -1, Unlock
-        [SEMAPHORE_TABLE + SEM_TABLE_INDEX*4] = -1;
+        // unlock semaphore
+        [SEMAPHORE_TABLE + 4*[resourceTable + 2*semDesc + 1] ] = -1;
 
-        // Looping through Process Table and Changing Processes Waiting for this Semaphore to READY
-        alias cnt R6;
+        //wake up processes blocked by the semaphore
+        //(WAIT_SEMAPHORE, Semaphore table index of the locked semaphore) -> (READY, _ )
+        alias cnt R7;
         cnt = 0;
-        while( cnt < 16 ) do
-            if([PROCESS_TABLE + cnt*16 + 4] == WAIT_SEMAPHORE && [PROCESS_TABLE + cnt*16 + 5] == SEM_TABLE_INDEX) then
-                [PROCESS_TABLE + cnt*16 + 4] = READY;
+        while ( cnt < 16) do
+            if ([PROCESS_TABLE + cnt*16 + 4]==WAIT_SEMAPHORE && [PROCESS_TABLE + cnt*16 + 5]==[resourceTable + 2*semDesc + 1]) then
+                [PROCESS_TABLE + cnt*16 + 4]= READY;
             endif;
             cnt = cnt + 1;
         endwhile;
-    endif;
-    // Mode Flag and Returning
-    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
-    SP = userSP;
-    // Return 0
-    alias physicalAddrRetVal R5;
-    physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
-    [physicalAddrRetVal] = 0;
-    ireturn; 
+    endif ;
 
+
+    [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = 0;    
+    goto end;
 endif;
 
-//------ Change back to userSP ----------------------------
-SP = userSP;
-ireturn; 
+
+end :
+//switch stack, mode
+SP = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13]; 
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
+
+ireturn;
+
+
+
+// // ------- SEM LOCK, SEM UNLOCK ------------------------------------------------------------------------------------------------------//
+// // ------  Extract Syscall Number from User stack (userSP - 5, will have it, as userSP-4 will have args for the Syscall) -------------
+// alias SysCallNum R1;
+// alias userSP R2;
+// userSP = SP;
+// SysCallNum = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 5)/ 512] * 512 + ((userSP - 5) % 512)];
+
+// //---- Switch Stack --------------------------------------------------------------------------------------------
+// [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+13] = SP;
+// SP = [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512-1;
+
+// // ------ SYSCALLS: SEMLOCK(Syscall 19) AND SEMUNLOCK(Syscall 20) -------------------
+
+// //------- SEMLOCK (19) -----------------------------------
+// // Arg: SEMID (Semaphore Descriptor, Index in Per Process Resource Table)
+// if(SysCallNum == 19) then
+//     alias SEMID R3;
+//     SEMID = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 4)/ 512] * 512 + ((userSP - 4) % 512)];
+//     alias SEM_TABLE_INDEX R4;
+//     SEM_TABLE_INDEX = [[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11] * 512 + 496 + 2*SEMID + 1];
+
+//     //---- Mode Flag -----
+//     [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 19;
+
+//     //---- Validity of SEMID: Range of SEMID not in (0-7) -----
+//     //---- OR Resource Identifier field in Per Process not 1 -----
+//     if( SEMID < 0 || SEMID > 7 || [[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 + 496 + 2*SEMID] != 1) then 
+//         // Mode Flag and Returning
+//         [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+//         SP = userSP;
+//         // Return -1
+//         alias physicalAddrRetVal R5;
+//         physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
+//         [physicalAddrRetVal] = -1;
+//         ireturn; 
+//     endif;
+//     // BUSY WAIT FOR LOCKING SEMAPHORE
+//     // Checking if it is Locked by Some Process then busy wait
+//     while([SEMAPHORE_TABLE + SEM_TABLE_INDEX*4] != -1) do 
+//         // WAITING FOR SEMAPHORE
+//         [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 4] = WAIT_SEMAPHORE;
+//         [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 5] = SEM_TABLE_INDEX;
+//         // CALL SCHEDULER
+//         multipush(R1,R2,R3,R4);
+//         call MOD_5;
+//         multipop(R1,R2,R3,R4);
+//     endwhile;
+    
+//     // Semaphore became Free, now Lock It
+//     [SEMAPHORE_TABLE + SEM_TABLE_INDEX*4] = [SYSTEM_STATUS_TABLE + 1];
+
+//     // Mode Flag and Returning
+//     [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+//     SP = userSP;
+//     // Return 0
+//     alias physicalAddrRetVal R5;
+//     physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
+//     [physicalAddrRetVal] = 0;
+//     ireturn; 
+// endif;
+
+// //------- SEM_UNLOCK (20) -----------------------------------
+// if(SysCallNum == 20) then
+//     alias SEMID R3;
+//     SEMID = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 4)/ 512] * 512 + ((userSP - 4) % 512)];
+//     alias SEM_TABLE_INDEX R4;
+//     SEM_TABLE_INDEX = [[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11] * 512 + 496 + 2*SEMID + 1];
+
+//     //---- Mode Flag -----
+//     [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 20;
+
+//     //---- Validity of SEMID: Range of SEMID not in (0-7) -----
+//     //---- OR Resource Identifier field in Per Process not 1 -----
+//     if( SEMID < 0 || SEMID > 7 || [[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 + 496 + 2*SEMID] != 1) then 
+//         // Mode Flag and Returning
+//         [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+//         SP = userSP;
+//         // Return -1
+//         alias physicalAddrRetVal R5;
+//         physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
+//         [physicalAddrRetVal] = -1;
+//         ireturn;
+//     endif;
+
+//     // If Semaphore is Locked
+//     if([SEMAPHORE_TABLE + SEM_TABLE_INDEX*4] != -1) then
+//         // If Semaphore was not Locked by the Current Process (may be some other process), do nothing return -2
+//         if([SEMAPHORE_TABLE + SEM_TABLE_INDEX*4] != [SYSTEM_STATUS_TABLE + 1]) then
+//             // Mode Flag and Returning
+//             [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+//             SP = userSP;
+//             // Return -2
+//             alias physicalAddrRetVal R5;
+//             physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
+//             [physicalAddrRetVal] = -2;
+//             ireturn;        
+//         endif;
+
+//         // Set Locking PID to -1, Unlock
+//         [SEMAPHORE_TABLE + SEM_TABLE_INDEX*4] = -1;
+
+//         // Looping through Process Table and Changing Processes Waiting for this Semaphore to READY
+//         alias cnt R6;
+//         cnt = 0;
+//         while( cnt < 16 ) do
+//             if([PROCESS_TABLE + cnt*16 + 4] == WAIT_SEMAPHORE && [PROCESS_TABLE + cnt*16 + 5] == SEM_TABLE_INDEX) then
+//                 [PROCESS_TABLE + cnt*16 + 4] = READY;
+//             endif;
+//             cnt = cnt + 1;
+//         endwhile;
+//     endif;
+//     // Mode Flag and Returning
+//     [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+//     SP = userSP;
+//     // Return 0
+//     alias physicalAddrRetVal R5;
+//     physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
+//     [physicalAddrRetVal] = 0;
+//     ireturn; 
+
+// endif;
+
+// //------ Change back to userSP ----------------------------
+// SP = userSP;
+// ireturn; 
