@@ -64,7 +64,7 @@ if (functionNum == SWAP_OUT) then
         [SYSTEM_STATUS_TABLE + 5] = 0;
         return;
     endif;
-    print "swapped pid"; print swapPID;
+    // print "swapped pid"; print swapPID;
     // Set the TICK field of the process table entry of the selected process to 0.
     [PROCESS_TABLE + swapPID*16 ] = 0;
 
@@ -161,14 +161,14 @@ if (functionNum == SWAP_IN) then
         endif;
         cnt = cnt + 1;
     endwhile ;
-    print "enter swapping";
+    //print "enter swapping";
     // If there is no such process, reset the PAGING_STATUS field to 0 and Return
     if(swapPID == -1) then
         [SYSTEM_STATUS_TABLE + 5] = 0;
         return;
     endif;
-    print "swapped in";
-    print swapPID;
+    // print "swapped in";
+    // print swapPID;
 
     // Set the TICK field of the process table entry of the selected process to 0
     [PROCESS_TABLE + swapPID*16 ] = 0;
