@@ -1,0 +1,60 @@
+alias functionNum R1;
+alias PID R2;
+
+// ----- Free User Area Page (funNum = 2) -----
+if(functionNum == 2) then
+    // calling Release Page (2), Args: funNum, PID
+	multipush(R1,R2);
+	R1 = 2;
+	R2 = [PROCESS_TABLE + PID*16 + 11];
+	call MOD_2;
+	multipop(R1,R2);
+	return;
+endif;
+
+// ----- Exit Process (funNum = 3) ----
+if(functionNum == 3) then
+    // Free Page Table (4), ARGS: funNum, PID
+	multipush(R1,R2);
+	R1 = 4;
+	R2 = PID;
+	call MOD_1;
+	multipop(R1,R2);
+    // Free User Area Page, ARGS: funNum, PID
+	multipush(R1,R2);
+	R1 = 2;
+	R2 = PID;
+	call MOD_1;
+	multipop(R1,R2);
+    // Set State
+	[PROCESS_TABLE + PID*16 + 4] = TERMINATED;
+	return;
+endif;
+
+// ---- Free Page Table (funNum = 4) ----
+if(functionNum == 4) then
+    PTBR = PAGE_TABLE_BASE + PID*20;    
+    // Library Invalidated
+    [PTBR + 0] = -1;
+	[PTBR + 1] = "0000";
+	[PTBR + 2] = -1;
+	[PTBR + 3] = "0000";
+    // Release Rest
+    alias counter R4;
+    counter = 4;
+    while(counter<20) do
+        if([PTBR + counter] != -1) then
+            // calling Release Page
+            multipush(R1,R2,R4);
+            R1 = 2;
+            R2 = [PTBR + counter];
+            call MOD_2;
+            [PTBR + counter] = -1;
+            [PTBR + counter+1] = "0000";
+            multipop(R1,R2,R4);
+        endif;
+        counter = counter + 2;
+    endwhile;
+
+    return;
+endif;

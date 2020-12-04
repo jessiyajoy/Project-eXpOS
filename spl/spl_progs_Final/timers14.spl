@@ -1,0 +1,31 @@
+// assig: Kernel Mode Switch
+// [70*512 + 511] = [70*512 + 511] + 1; 
+
+// SWITCH STACKS: USER TO KERNEL and Backup (Hardware Interrupt)
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP;
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1;
+
+// BACKUP the regs of curr. running process
+backup;
+
+// Get Process Table for curr. process and put STATE as READY
+alias currentPID R0;
+currentPID = [ SYSTEM_STATUS_TABLE + 1 ];
+alias process_table_entry R1;
+process_table_entry = PROCESS_TABLE + currentPID * 16;
+[process_table_entry + 4] = READY;
+
+// invoke SCHEDULER
+call SCHEDULER;
+
+// RESTORE the Regs of SOME OTHER PROCESS DETERMINED BY SCHEDULER
+// and also the curr value of SP (SET by SCHEDULER)
+restore;
+
+// user_SP of the new Process
+SP = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13];
+
+// Set the MODE_FLAG in the process table entry to 0
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 9] = 0;
+
+ireturn;

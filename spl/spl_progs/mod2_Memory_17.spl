@@ -1,0 +1,54 @@
+alias functionNum R1;
+alias releasePageNum R2;
+
+// ----- Get Free Page (funNum = 1) -----
+if(functionNum == 1) then
+    // WAIT_MEM_COUNT (3) incr
+    [SYSTEM_STATUS_TABLE + 3] = [SYSTEM_STATUS_TABLE + 3] + 1;
+
+    // when mem_free_count==0, implies when FULL, BUSY WAIT
+    while([SYSTEM_STATUS_TABLE + 2] == 0) do
+        [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 4] = WAIT_MEM;
+        // calling Scheduler
+		multipush(R1,R2);
+		call SCHEDULER;
+		multipop(R1,R2);
+    endwhile;
+    // wait_mem_count and mem_free_count
+    [SYSTEM_STATUS_TABLE + 3] = [SYSTEM_STATUS_TABLE + 3] - 1;
+	[SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] - 1;
+    
+    // find free page using mem free list
+    alias freePage R5;
+	freePage = 0;
+	while([MEMORY_FREE_LIST + freePage] != 0) do
+		freePage = freePage + 1;
+	endwhile;
+	[MEMORY_FREE_LIST + freePage] = 1;
+    R0 = freePage;
+    //assig
+    // breakpoint;
+	return;
+endif;
+
+// ---- Release Page -----
+if(functionNum == 2) then
+    // mem_free_list updated
+    [MEMORY_FREE_LIST + releasePageNum] = [MEMORY_FREE_LIST + releasePageNum] - 1;
+    // If the above page gets to 0, implies one more free page, incr mem_free_cnt in SYSTEM STATUS TABLE
+    if([MEMORY_FREE_LIST + releasePageNum] == 0) then
+		[SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] + 1;
+	endif;
+    //STATE field of Processes from WAIT_MEM to READY
+    alias var R3;
+    var = 0;
+    while( var < 16 ) do
+        if( [PROCESS_TABLE + 16*var + 4] ==  WAIT_MEM) then
+            [PROCESS_TABLE + 16*var + 4] = READY;
+        endif ;
+        var = var + 1;
+    endwhile ;
+    //assig
+    // breakpoint;
+    return;
+endif;

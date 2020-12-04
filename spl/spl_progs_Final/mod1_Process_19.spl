@@ -1,0 +1,107 @@
+alias functionNum R1;
+alias PID R2;
+
+// ----- Free User Area Page (funNum = 2) -----
+if(functionNum == 2) then
+    // calling Release Page (2), Args: funNum, User Area Page Number to free (get from Process Table)
+	multipush(R1,R2);
+	R1 = 2;
+	R2 = [PROCESS_TABLE + PID*16 + 11];
+	call MOD_2;
+	multipop(R1,R2);
+	return;
+endif;
+
+// ----- Exit Process (funNum = 3) ----
+if(functionNum == 3) then
+    // Free Page Table (4), ARGS: funNum, PID
+	multipush(R1,R2);
+	R1 = 4;
+	R2 = PID;
+	call MOD_1;
+	multipop(R1,R2);
+    // Free User Area Page, ARGS: funNum, PID
+	multipush(R1,R2);
+	R1 = 2;
+	R2 = PID;
+	call MOD_1;
+	multipop(R1,R2);
+    // Set State
+	[PROCESS_TABLE + PID*16 + 4] = TERMINATED;
+	return;
+endif;
+
+// ---- Free Page Table (funNum = 4) ----
+if(functionNum == 4) then
+    PTBR = PAGE_TABLE_BASE + PID*20;
+
+    // Library Invalidated
+    [PTBR + 0] = -1;
+	[PTBR + 1] = "0000";
+	[PTBR + 2] = -1;
+	[PTBR + 3] = "0000";
+
+    // Heap, Code, Stack Freed
+    alias counter R4;
+    counter = 4;
+    while(counter<20) do
+        if([PTBR + counter] != -1) then
+            // calling Release Page
+            multipush(R1,R2,R4);
+            R1 = 2;
+            R2 = [PTBR + counter];
+            call MOD_2;
+            [PTBR + counter] = -1;
+            [PTBR + counter+1] = "0000";
+            multipop(R1,R2,R4);
+        endif;
+        counter = counter + 2;
+    endwhile;
+
+    // Check Disk Map Table for Any Temporary Disk Block Allocations for Stack/Heap
+    // Heaps:
+    if([DISK_MAP_TABLE + PID*10 + 2] != -1) then
+        // Call Release Block Function (FunNum = 4, Memory Manager)
+        // ARGS: FunNum, Block Number, PID
+		multipush(R1,R2,R3,R4);
+		R3 = PID;
+		R2 = [DISK_MAP_TABLE + PID*10 + 2];
+        R1 = 4;
+		call MOD_2;
+		multipop(R1,R2,R3,R4);
+	endif;
+	if([DISK_MAP_TABLE + PID*10 + 3] != -1) then
+		multipush(R1,R2,R3,R4);
+		R3 = PID;
+		R2 = [DISK_MAP_TABLE + PID*10 + 3];
+        R1 = 4;
+		call MOD_2;
+		multipop(R1,R2,R3,R4);
+	endif;
+
+    // Stacks:
+    if([DISK_MAP_TABLE + PID*10 + 8] != -1) then
+        multipush(R1,R2,R3,R4);
+        R3 = PID;
+        R2 = [DISK_MAP_TABLE + PID*10 + 8];
+        R1 = 4;
+        call MOD_2;
+        multipop(R1,R2,R3,R4);
+	endif;
+    if([DISK_MAP_TABLE + PID*10 + 9] != -1) then
+        multipush(R1,R2,R3,R4);
+        R3 = PID;
+        R2 = [DISK_MAP_TABLE + PID*10 + 9];
+        R1 = 4;
+        call MOD_2;
+        multipop(R1,R2,R3,R4);
+	endif;
+
+    // Invalidate the DISK MAP TABLE for this Process 
+	counter = 0;
+	while(counter <= 9) do
+		[DISK_MAP_TABLE + PID*10 + counter] = -1;
+        counter = counter + 1;
+	endwhile;
+    return;
+endif;

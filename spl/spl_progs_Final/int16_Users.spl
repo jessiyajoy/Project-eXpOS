@@ -1,0 +1,294 @@
+// --------- USER MANAGEMENT SYSCALLS ----------------------------------------------------------------------------------
+// SYSCALLS: 
+// Newusr(22), 
+// Remusr(23), 
+// Setpwd(24), 
+// Getuname(25) 
+// Getuid(26)
+
+//---- Extract Syscall Number from User stack (at userSP - 5)------------
+alias SysCallNum R1;
+alias userSP R2;
+userSP = SP;
+SysCallNum = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 5)/ 512] * 512 + ((userSP - 5) % 512)];
+
+//---- Switch Stack --------------------------------------------------------------------------------------------
+[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+13] = SP;
+SP = [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512-1;
+
+alias physicalAddrRetVal R3;
+physicalAddrRetVal = ([PTBR + 2 * (userSP - 1)/ 512] * 512) + ((userSP - 1) % 512);
+
+alias currPID R4;
+currPID = [SYSTEM_STATUS_TABLE + 1];
+
+alias processEntry R5;
+processEntry = PROCESS_TABLE + currPID * 16;
+
+//---- Get Args ------------------------------------
+alias arg1 R6;
+alias arg2 R7;
+arg1 = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+arg2 = [[PTBR + 2*((userSP-3)/512)]*512 + (userSP-3)%512];
+
+
+//---- Syscalls --------------------------------------------------------------------------------------------------------------
+
+//---- Newusr(22) ------------------------------------------------------------------------------------------
+// Arguments: 
+// 1. User name
+// 2. Password
+// Returns:
+// 0	:Success
+// -1	:User already exists
+// -2	:Permission denied
+// -3	:Number of users has reached the system limit.
+
+if( SysCallNum == 22) then
+    //---- Mode Flag -----------
+    [processEntry + 9] = 22;
+
+    //-- Name the Args ---------
+    alias username R6;
+    alias password R7;
+
+    //--- If Current User Not ROOT (userID = 1, CURRENT_USER_ID field) or Current Process is Not SHELL(PID = 2) -------------
+    if( [SYSTEM_STATUS_TABLE + 0] != 1  || currPID != 2 ) then
+        // return -2
+        [physicalAddrRetVal] = -2;
+        goto end;
+    endif;
+
+    //--- Check if the given User Already exists (return -1)-------------
+    alias i R8;
+    i = 0;		
+	while(i < MAX_USER_NUM)	do
+		if([USER_TABLE + i*2] == username) then
+            // return -1
+            [physicalAddrRetVal] = -1;
+            goto end;
+		endif;
+	i = i + 1;
+	endwhile;
+
+    //--- Find Free Entry in the USER TABLE -----------------------------
+    alias userid R8;
+    userid = 2;
+    while(userid < MAX_USER_NUM) do
+    if([USER_TABLE + 2*userid + 0] == -1) then
+        break;
+    endif;
+	userid = userid + 1;
+    endwhile;
+    // If no Free Entry in USER TABLE
+    if(userid == MAX_USER_NUM) then
+        // return -3
+        [physicalAddrRetVal] = -3;
+        goto end;
+    endif;
+
+    // Find Encrypted Password
+    encrypt password;
+
+    // -- Setting Up the USER TABLE ENTRY for New User ---------------------------
+    [USER_TABLE + 2*userid + 0] = username;
+	[USER_TABLE + 2*userid + 1] = password;
+
+    // Return 0, Success
+    [physicalAddrRetVal] = 0;
+    goto end;
+endif;
+
+//---- Remusr(23) ------------------------------------------------------------------------------------------
+// Arguments: User name
+// Returns:
+// 0	:Success
+// -1	:User does not exist
+// -2	:Permission denied
+// -3	:Undeleted files exist for the user
+if( SysCallNum == 23) then
+    //---- Mode Flag -----------
+    [processEntry + 9] = 23;
+
+    //-- Name the Args ---------
+    alias username R6;
+
+    //--- If Current User Not ROOT (userID = 1, CURRENT_USER_ID field) or Current Process is Not SHELL(PID = 2) -------------
+    if( [SYSTEM_STATUS_TABLE + 0] != 1  || currPID != 2 ) then
+        // return -2
+        [physicalAddrRetVal] = -2;
+        goto end;
+    endif;
+
+    //-- Cannot Remove ROOT or KERNEL Users ---------------------------------
+    if( username == "root"  ||  username == "kernel" ) then
+        // return -2
+        [physicalAddrRetVal] = -2;
+        goto end;
+    endif;
+
+    //-- Find the User Table Entry (UserID) -------------------------------------
+    alias userid R7;
+    userid = 0;
+    while(userid < MAX_USER_NUM) do
+		if([USER_TABLE + 2*userid] == username) then
+			break;
+		endif;
+	userid = userid + 1;
+	endwhile;
+    //-- If No Entry Found, return -1 -------
+    if(userid == MAX_USER_NUM) then
+        [physicalAddrRetVal] = -1;
+        goto end;
+    endif;
+
+    //-- Check if Undeleted files exist for the User -------------------------------------
+    // Cannot Remove User if Yes, return -3
+    // Loop Through the ROOT FILE (which has the username)
+    alias i R8;
+	i = 0;
+	while(i < MAX_FILE_NUM) do
+		if([ROOT_FILE + i*8 + 0] != -1  &&  [ROOT_FILE + i*8 + 3] == username) then
+            [physicalAddrRetVal] = -1;
+            goto end;
+		endif;
+	    i = i + 1;
+	endwhile;
+
+    //-- Invalidate the USERTABLE entry for the User----------------------------------------------------
+	[USER_TABLE + 2*userid + 0] = -1;
+	[USER_TABLE + 2*userid + 1] = -1;
+
+    //-- Return 0, Success ----------------------------
+    [physicalAddrRetVal] = 0;
+    goto end;
+
+endif;
+
+//---- Setpwd(24) ------------------------------------------------------------------------------------------
+// Arguments: 
+// 1. User name
+// 2. Password
+// Returns:
+// 0	Success
+// -1	Unauthorised attempt to change password
+// -2	The user does not exist
+
+if( SysCallNum == 24) then
+    //---- Mode Flag -----------
+    [processEntry + 9] = 24;
+
+    //-- Name the Args ---------
+    alias username R6;
+    alias password R7;
+
+    //--- If Current Process is Not SHELL(PID = 2) -------------
+    if( currPID != 2 ) then
+        // return -1
+        [physicalAddrRetVal] = -1;
+        goto end;
+    endif;
+
+    //-- Find the User Table Entry (UserID) -------------------------------------
+    alias userid R8;
+    userid = 0;
+    while(userid < MAX_USER_NUM) do
+        if([USER_TABLE + 2*userid] == username) then
+            break;
+        endif;
+    userid = userid + 1;
+    endwhile;
+    //-- If No Entry Found, return -2 -------
+    if(userid == MAX_USER_NUM) then
+        [physicalAddrRetVal] = -2;
+        goto end;
+    endif;
+
+    // A user can set only his/her password. 
+    // Root user can set any user's password.
+    // if userid of process != userid given
+    if( [processEntry + 3] != userid ) then
+        if( [processEntry + 3] != 1 ) then
+            // if current user not ROOT
+            // return -1
+            [physicalAddrRetVal] = -1;
+            goto end;
+        endif;
+    endif;
+
+    // Encrypt the Password and Store the New Password
+    encrypt password;
+    [USER_TABLE + userid*2 + 1] = password;
+
+    // Return 0, Success
+    [physicalAddrRetVal] = 0;
+    goto end;
+
+endif;
+
+//---- Getuname(25) ------------------------------------------------------------------------------------------
+// Arguments: User ID
+// Returns:
+// -1       : Invalid UserID
+// UserName	: Success
+if( SysCallNum == 25) then
+    //---- Mode Flag -----------
+    [processEntry + 9] = 25;
+
+    //-- Name the Args ---------
+    alias userid R6;
+
+    //-- Validity of userid -------------
+    if( userid < 0 || userid > 15 ) then
+        // Invalid => return -1
+        [physicalAddrRetVal] = -1;
+        goto end;
+    endif;
+
+    //-- Validity of USERT TABLE Entry -----------
+    if( [USER_TABLE + userid*2] == -1 ) then
+        // Invalid Entry => return -1
+        [physicalAddrRetVal] = -1;
+        goto end;
+    endif;
+
+    //-- Return the UserName from USER TABLE Entry -----------------------
+    [physicalAddrRetVal] = [USER_TABLE + userid*2];
+    goto end;
+
+endif;
+
+//---- Getuid(26) ------------------------------------------------------------------------------------------
+// Arguments: UserName
+// Returns:
+// -1       : Invalid UserName
+// UserID	: Success
+if( SysCallNum == 26) then
+    //---- Mode Flag -----------
+    [processEntry + 9] = 26;
+
+    //-- Name the Args ---------
+    alias username R6;
+
+    //-- Get the UserID from UserTable ------------
+    alias userid R7;
+    userid = 0;
+    while(userid < MAX_USER_NUM) do
+        if([USER_TABLE + 2*userid] == username) then
+            [physicalAddrRetVal] = userid;
+            goto end;
+        endif;
+    userid = userid + 1;
+    endwhile;
+
+    //-- If No Entry Found, return -1 -------
+    [physicalAddrRetVal] = -1;
+    goto end;
+    
+endif;
+
+
+end:
+[processEntry + 9] = 0;
+SP = userSP;
+ireturn; 

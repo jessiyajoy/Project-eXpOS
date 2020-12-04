@@ -1,0 +1,8 @@
+alias cnt R0;
+cnt = 0;
+while(cnt<=20) do
+	if(cnt%2!=0) then
+		breakpoint;
+	endif;
+	cnt=cnt+1;
+endwhile;

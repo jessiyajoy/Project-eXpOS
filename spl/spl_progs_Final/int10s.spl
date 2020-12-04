@@ -1,0 +1,16 @@
+
+//Mode
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 10;
+
+//--Switch Stack
+//save user SP, set SP to KPTR
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP;
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1;
+R4 = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9];
+R1 = 3;
+R2 = [SYSTEM_STATUS_TABLE + 1];
+print "EXIT PID";
+print [SYSTEM_STATUS_TABLE + 1];
+call MOD_1;
+
+call SCHEDULER;

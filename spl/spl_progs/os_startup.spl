@@ -1,76 +1,82 @@
-//module 7
-loadi(54,67);
-loadi(55,68);
+// Load in
 
-//idle code
-loadi(69,11);
-loadi(70,12);
+// Timer
+loadi(4, 17);
+loadi(5, 18);
 
-//(user area page number) * 512 -1 
-// 82 * 512 - 1
-SP = [PROCESS_TABLE + 11] * 512 - 1;
+// Library
+loadi(63,13);
+loadi(64,14);
 
-call BOOT_MODULE;
+// INIT PROG
+loadi(65, 7);
+loadi(66, 8);
 
-//idle process
+// INT7
+loadi(16,29);
+loadi(17,30);
 
-PTBR = PAGE_TABLE_BASE;  //as PID of idle process is 0
+// INT10
+loadi(22,35);
+loadi(23,36);
+
+// Exception Handler
+loadi(2, 15);
+loadi(3, 16);
+
+
+// Process Table (KTPR is not Set and User Stack Page is stored when change stack)
+
+// UArea Page
+[PROCESS_TABLE + 11] = 80;
+
+// PID
+[PROCESS_TABLE + 1] = 0;
+
+
+
+// System Status Table
+
+// PID 
+[SYSTEM_STATUS_TABLE + 1] = 0;
+
+// Page Table
+
+PTBR = PAGE_TABLE_BASE;
 PTLR = 10;
 
-//Library
-[PTBR+0] = -1;
-[PTBR+1] = "0000";
-[PTBR+2] = -1;
-[PTBR+3] = "0000";
+// Library
+[PTBR+0] = 63;
+[PTBR+1] = "0100";
+[PTBR+2] = 64;
+[PTBR+3] = "0100";
 
-//Heap
-[PTBR+4] = -1;
-[PTBR+5] = "0000";
-[PTBR+6] = -1;
-[PTBR+7] = "0000";
+// Heap
+[PTBR+4] = 78;
+[PTBR+5] = "0110";
+[PTBR+6] = 79;
+[PTBR+7] = "0110";
 
-//Code
-[PTBR+8] = 69;
+
+// Code
+[PTBR+8] = 65;
 [PTBR+9] = "0100";
-[PTBR+10] = 70;
+[PTBR+10] = 66;
 [PTBR+11] = "0100";
 [PTBR+12] = -1;
 [PTBR+13] = "0000";
 [PTBR+14] = -1;
 [PTBR+15] = "0000";
 
-//Stack
-[PTBR+16] = 81;
+// Stack
+[PTBR+16] = 76;
 [PTBR+17] = "0110";
-[PTBR+18] = -1;
-[PTBR+19] = "0000";
+[PTBR+18] = 77;
+[PTBR+19] = "0110";
 
-//process id
-[PROCESS_TABLE + 1] = 0;
-
-//status
-[PROCESS_TABLE + 4] = RUNNING;
-
-//user area page
-[PROCESS_TABLE + 11] = 82;
-
-//UPTR
-[PROCESS_TABLE + 13] = 8*512;
-
-//KPTR
-[PROCESS_TABLE + 12] = 0;
-
-//PTBR, PTLR
-[PROCESS_TABLE + 14] = PAGE_TABLE_BASE;
-[PROCESS_TABLE + 15] = 10;
-
-[SYSTEM_STATUS_TABLE + 1] = 0;
-PTBR = PAGE_TABLE_BASE;
-PTLR = 10;
-
-//set entry point in user stack
-[81 * 512] = [69*512 + 1];
+// iret steps
 SP = 8*512;
+[76*512] = [65 * 512 + 1];
 
 ireturn;
-
+  

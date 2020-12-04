@@ -1,0 +1,8 @@
+alias num1 R0;
+alias res R1;
+num1=1;
+while(num1<=20) do
+        res = num1*num1;
+        print res;
+        num1=num1+1;
+endwhile;

@@ -1,30 +1,30 @@
-load --os ../spl/spl_progs/os_startup_st26.xsm
+load --os ../spl/spl_progs20/os_startup_26.xsm
 load --shell ../expl/expl_progs/26/extShell.xsm
 load --init ../expl/expl_progs/26/login.xsm
 load --idle ../expl/expl_progs/idle_st12.xsm
-load --module 0 ../spl/spl_progs/resourcemanager0_st24.xsm
-load --module 1 ../spl/spl_progs/processmanager1_st25.xsm
-load --module 2 ../spl/spl_progs/memorymanager2_st25.xsm
-load --module 3 ../spl/spl_progs/filemanager3_st25.xsm
-load --module 4 ../spl/spl_progs/devicemanager4_st23.xsm
-load --module 5 ../spl/spl_progs/scheduler5_st20.xsm
-load --module 7 ../spl/spl_progs/bootmodule7_st26.xsm
-load --int=4 ../spl/spl_progs/int4.xsm
-load --int=5 ../spl/spl_progs/int5.xsm
-load --int=6 ../spl/spl_progs/int6_st24.xsm
-load --int=7 ../spl/spl_progs/int7_st25.xsm
-load --int=8 ../spl/spl_progs/int8_st24.xsm
-load --int=9 ../spl/spl_progs/int9.xsm
-load --int=10 ../spl/spl_progs/int10.xsm
-load --int=11 ../spl/spl_progs/int11.xsm
-load --int=12 ../spl/spl_progs/int12_st26.xsm
-load --int=13 ../spl/spl_progs/int13.xsm
-load --int=14 ../spl/spl_progs/int14.xsm
-load --int=15 ../spl/spl_progs/int15_st26.xsm
-load --int=16 ../spl/spl_progs/int16_st26.xsm
-load --int=17 ../spl/spl_progs/int17_st26.xsm
-load --int=timer ../spl/spl_progs/timer.xsm
-load --int=console  ../spl/spl_progs/console.xsm
-load --int=disk  ../spl/spl_progs/diskint.xsm
-load --exhandler ../spl/spl_progs/exception_handler.xsm
+load --module 7 ../spl/spl_progs20/mod7_Boot_26.xsm
+load --module 5 ../spl/spl_progs20/mod5_Scheduler_20.xsm
+load --module 4 ../spl/spl_progs20/mod4_Device_23.xsm
+load --module 3 ../spl/spl_progs20/mod3_FileManager_25.xsm
+load --module 2 ../spl/spl_progs20/mod2_Memory_25.xsm
+load --module 1 ../spl/spl_progs20/mod1_Process_25.xsm
+load --module 0 ../spl/spl_progs20/mod0_Resource_24.xsm
+load --int=10 ../spl/spl_progs20/int10_s20.xsm
+load --exhandler ../spl/spl_progs20/exception_handler.xsm
 load --library ../expl/library.lib
+load --int=timer ../spl/spl_progs20/timers14.xsm
+load --int=17 ../spl/spl_progs20/int17_Login.xsm
+load --int=16 ../spl/spl_progs20/int16_Users.xsm
+load --int=15 ../spl/spl_progs20/int15_Shutdown_26.xsm
+load --int=14 ../spl/spl_progs20/int14_s22.xsm
+load --int=13 ../spl/spl_progs20/int13_s22.xsm
+load --int=12 ../spl/spl_progs20/int12_Logout.xsm
+load --int=11 ../spl/spl_progs20/int11_s21.xsm
+load --int=9 ../spl/spl_progs20/int9_Exec_19.xsm
+load --int=8 ../spl/spl_progs20/int8_Fork_24.xsm
+load --int=7 ../spl/spl_progs20/int7_write_25.xsm
+load --int=6 ../spl/spl_progs20/int6_read_24.xsm
+load --int=5 ../spl/spl_progs20/int5_file_25.xsm
+load --int=4 ../spl/spl_progs20/int4.xsm
+load --int=console ../spl/spl_progs20/console_int_16.xsm
+load --int=disk ../spl/spl_progs20/disk_int_18.xsm

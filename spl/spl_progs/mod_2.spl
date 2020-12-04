@@ -1,0 +1,114 @@
+alias functionNum R1;
+alias pageNum R2;
+
+//get free page fn;
+if(functionNum==1) then
+	//print "memory usage";
+	[SYSTEM_STATUS_TABLE+3]=[SYSTEM_STATUS_TABLE+3]+1;
+	while([SYSTEM_STATUS_TABLE+2]==0) do
+		print "out of free space";
+		[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+4]=WAIT_MEM;
+		//print [SYSTEM_STATUS_TABLE+1];
+		call SCHEDULER;
+		//print [SYSTEM_STATUS_TABLE+1];
+	endwhile;
+	[SYSTEM_STATUS_TABLE+3]=[SYSTEM_STATUS_TABLE+3]-1;
+	[SYSTEM_STATUS_TABLE+2]=[SYSTEM_STATUS_TABLE+2]-1;
+	alias i R3;
+	i=83;
+	while(i<128) do
+		if([MEMORY_FREE_LIST+i]==0) then
+			//print i;
+			R0=i;
+			[MEMORY_FREE_LIST+i]=1;
+			breakpoint;
+			//print R0;
+			return;
+			break;
+		endif;
+		i=i+1;
+	endwhile;
+	print "error";
+endif;
+
+//release page fn
+if(functionNum==2) then
+	[MEMORY_FREE_LIST+pageNum]=[MEMORY_FREE_LIST+pageNum]-1;
+	if([MEMORY_FREE_LIST+pageNum]==0) then
+		[SYSTEM_STATUS_TABLE+2]=[SYSTEM_STATUS_TABLE+2]+1;
+	endif;
+	alias i R3;
+	i=0;
+	while(i<16) do
+		if([PROCESS_TABLE+16*i+4]==WAIT_MEM) then
+			[PROCESS_TABLE+16*i+4]=READY;
+		endif;
+		i=i+1;
+	endwhile;
+	breakpoint;
+	return;
+endif;
+//there is an assumption that ptlr is 10(beware)
+//get code page
+if(functionNum==5) then
+	alias blockNo R2;
+	alias i R3;
+	i=0;
+	while(i<16) do
+		if( (blockNo==[DISK_MAP_TABLE+i*10+4] && [PAGE_TABLE_BASE+i*20+8]!=-1)) then
+			[MEMORY_FREE_LIST+[PAGE_TABLE_BASE+i*20+8]]=[MEMORY_FREE_LIST+[PAGE_TABLE_BASE+i*20+8]]+1;
+			R0=[PAGE_TABLE_BASE+i*20+8];
+			return;
+		else
+			if( (blockNo==[DISK_MAP_TABLE+i*10+5] && [PAGE_TABLE_BASE+i*20+10]!=-1)) then
+				[MEMORY_FREE_LIST+[PAGE_TABLE_BASE+i*20+10]]=[MEMORY_FREE_LIST+[PAGE_TABLE_BASE+i*20+10]]+1;
+				R0=[PAGE_TABLE_BASE+i*20+10];
+				return;
+			else
+				if( (blockNo==[DISK_MAP_TABLE+i*10+6] && [PAGE_TABLE_BASE+i*20+12]!=-1)) then
+					[MEMORY_FREE_LIST+[PAGE_TABLE_BASE+i*20+12]]=[MEMORY_FREE_LIST+[PAGE_TABLE_BASE+i*20+12]]+1;
+					R0=[PAGE_TABLE_BASE+i*20+12];
+					return;
+				else
+					if( (blockNo==[DISK_MAP_TABLE+i*10+7] && [PAGE_TABLE_BASE+i*20+14]!=-1)) then
+						[MEMORY_FREE_LIST+[PAGE_TABLE_BASE+i*20+14]]=[MEMORY_FREE_LIST+[PAGE_TABLE_BASE+i*20+14]]+1;
+						R0=[PAGE_TABLE_BASE+i*20+14];
+						return;
+					endif;
+				endif;
+			endif;
+		endif;
+		i=i+1;
+		
+	endwhile;
+
+	if(i==16) then
+		multipush(R1,R2,R3);
+		R1=1;
+		call MOD_2;
+		multipop(R1,R2,R3);
+		multipush(R0,R1,R2,R3);
+		R1=2;
+		R4=blockNo;
+		R2=[SYSTEM_STATUS_TABLE+1];
+		R3=R0;
+		//print "disk";
+		call MOD_4;
+		multipop(R0,R1,R2,R3);
+		return; //R0 is returned;
+	endif;
+endif;
+
+//release block fn
+if(functionNum==4) then
+	alias blockNo R2;
+	[DISK_FREE_LIST+blockNo]=[DISK_FREE_LIST+blockNo]-1;
+	return;
+endif;
+breakpoint;
+return;
+
+
+
+
+

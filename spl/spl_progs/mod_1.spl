@@ -1,0 +1,141 @@
+alias functionNum R1;
+alias pid R2;
+alias userPage R3;
+
+//free user area page fn
+if(functionNum==2) then 
+	userPage=[PROCESS_TABLE+16*pid+11];
+	multipush(R1,R2,R3);
+	R1=2;
+	R2=userPage;
+	call MOD_2;
+	multipop(R1,R2,R3);
+	alias i R4;
+	i=1;
+	while(i<=16) do
+		if(i%2==0) then
+			if([[PROCESS_TABLE+pid*16+11]*512 +512 -i]==SEMAPHORE) then
+				multipush(R1,R2,R3,R4);
+				R1=7;
+				R3=pid;
+				R2=[[PROCESS_TABLE+pid*16+11]*512 +512 -i+1];
+				call MOD_0;
+				multipop(R1,R2,R3,R4);
+			endif;
+		endif;
+		i=i+1;
+	endwhile;
+	return;
+endif;
+
+//exit process fn
+if(functionNum==3) then 
+	multipush(R1,R2,R3);
+	R1=4;
+	R2=pid;
+	call MOD_1;
+	multipop(R1,R2,R3);
+	multipush(R1,R2,R3);
+	R1=2;
+	R2=pid;
+	call MOD_1;
+	multipop(R1,R2,R3);
+	[PROCESS_TABLE+16*pid+4]=TERMINATED;
+	return;
+endif;
+
+//free page table fn
+if(functionNum==4) then
+	alias ptbr R4;
+	alias ptlr R5;
+	alias i R6;
+	ptbr=[PROCESS_TABLE+ pid*16 +14];
+	ptlr=[PROCESS_TABLE+ pid*16 +15];
+	[ptbr+0]=-1;
+	[ptbr+1]="0000";
+	[ptbr+2]=-1;
+	[ptbr+3]="0000";
+	i=4;
+	while(i<(2*ptlr)) do
+		if([ptbr+i]!=-1) then
+			multipush(R1,R2,R3,R4,R5,R6);
+			R1=2;
+			R2=[ptbr+i];
+			//print R2;
+			call MOD_2;
+			multipop(R1,R2,R3,R4,R5,R6);
+			[ptbr+i]=-1;
+			[ptbr+i+1]="0000";
+		endif;
+		i=i+2;
+	endwhile;
+	if([DISK_MAP_TABLE+pid*10+2]!=-1) then
+		multipush(R1,R2,R3,R4,R5,R6);
+		R1=4;
+		R2=[DISK_MAP_TABLE+pid*10+2];
+		call MOD_2;
+		multipop(R1,R2,R3,R4,R5,R6);
+		[DISK_MAP_TABLE+pid*10+2]=-1;
+	endif;
+	if([DISK_MAP_TABLE+pid*10+3]!=-1) then
+		multipush(R1,R2,R3,R4,R5,R6);
+		R1=4;
+		R2=[DISK_MAP_TABLE+pid*10+2];
+		call MOD_2;
+		multipop(R1,R2,R3,R4,R5,R6);
+		[DISK_MAP_TABLE+pid*10+3]=-1;
+	endif;
+	if([DISK_MAP_TABLE+pid*10+8]!=-1) then
+		multipush(R1,R2,R3,R4,R5,R6);
+		R1=4;
+		R2=[DISK_MAP_TABLE+pid*10+2];
+		call MOD_2;
+		multipop(R1,R2,R3,R4,R5,R6);
+		[DISK_MAP_TABLE+pid*10+8]=-1;
+	endif;
+	if([DISK_MAP_TABLE+pid*10+9]!=-1) then
+		multipush(R1,R2,R3,R4,R5,R6);
+		R1=4;
+		R2=[DISK_MAP_TABLE+pid*10+2];
+		call MOD_2;
+		multipop(R1,R2,R3,R4,R5,R6);
+		[DISK_MAP_TABLE+pid*10+9]=-1;
+	endif;
+	
+	return;
+endif;
+
+if(functionNum==1) then
+	alias i R4;
+	i=0;
+	//print "search start";
+	while(i<16) do
+		
+	//	print [PROCESS_TABLE+i*16+4];
+		if([PROCESS_TABLE+i*16+4]==TERMINATED) then
+	//		print "search end";
+			R0=i;
+			[PROCESS_TABLE+i*16+1]=R0;
+			//print i;
+			[PROCESS_TABLE+i*16+14]=PAGE_TABLE_BASE+i*20;
+			[PROCESS_TABLE+i*16+15]=10;
+			[PROCESS_TABLE+i*16+4]=ALLOCATED;
+			return;
+		endif;
+		i=i+1;
+	endwhile;
+	R0=-1;
+	return;
+endif;
+
+
+
+
+
+
+
+
+
+
+
+

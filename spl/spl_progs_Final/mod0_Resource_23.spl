@@ -1,0 +1,179 @@
+// // ACQUIRE_DISK 3, 
+// // ACQUIRE_INODE 4, RELEASE_INODE 5, 
+// // ACQUIRE_SEMAPHORE 6, RELEASE_SEMAPHORE 7,
+// // ACQUIRE_TERMINAL 8, RELEASE_TERMINAL 9
+
+alias functionNum R1;
+
+// ---- Aquire Disk Function (num = 3) -----
+// Args: PID
+if( functionNum == 3) then
+    alias currentPID R2;
+    // BUSY WAIT
+    while([DISK_STATUS_TABLE] == 1) do
+        [PROCESS_TABLE + currentPID*16 + 4] = WAIT_DISK;
+        multipush(R1, R2);
+        // Scheduler 
+		call SCHEDULER;
+		multipop(R1, R2);
+    endwhile;
+    // Update Disk Status Table
+    [DISK_STATUS_TABLE] = 1;
+    [DISK_STATUS_TABLE + 4] = currentPID;
+    return;
+endif;
+
+// ---- Acquire Inode Function (num = 4) ---------
+if ( functionNum == 4 ) then
+    alias inodeindex R2;
+    alias PID R3;
+
+    // BUSY WAIT by seeing Lock Field in FILE STATUS Table
+    while ( [FILE_STATUS_TABLE + inodeindex*4] != -1 ) do
+        // Set state of Process to (WAIT_FILE, InodeIndex)
+        [PROCESS_TABLE + PID*16 + 4] = WAIT_FILE;
+        [PROCESS_TABLE + PID*16 + 5] = inodeindex;
+        multipush(R1, R2, R3);
+        // Scheduler 
+		call SCHEDULER;
+		multipop(R1, R2, R3);
+    endwhile;
+
+    // If inode becomes invalid 
+    // --- /* File was deleted by the time the inode was acquired */ -------
+    if([INODE_TABLE + inodeindex*16 + 1] == -1) then
+        // return -1
+        R0 = -1;
+        return;
+    endif;
+
+    // --- Lock the Inode by Setting the Lock Field in FILE STATUS Table ----
+    [FILE_STATUS_TABLE + inodeindex*4] = PID;
+    R0 = 0;
+    return;
+endif;
+
+// ---- Release Inode Function (num = 5) ---------
+if ( functionNum == 5 ) then
+    alias inodeindex R2;
+    alias PID R3;
+
+    // If PID is not equal to the LOCKING PID in the FILE STATUS Table, return -1.
+    if(PID != [FILE_STATUS_TABLE + inodeindex*4]) then
+        R0 = -1;
+        return;
+    endif;
+
+    // Free the Lock in FILE STATUS Table Corresponding to Inode at inodeindex
+    [FILE_STATUS_TABLE + inodeindex*4] = -1;
+
+    // Wake Up all processes waiting for this Inode
+    alias cnt R4;
+    cnt = 0;
+    while( cnt < 16 ) do
+        if([PROCESS_TABLE + cnt*16 + 4] == WAIT_FILE && [PROCESS_TABLE + cnt*16 + 5] == inodeindex) then
+            [PROCESS_TABLE + cnt*16 + 4] = READY;
+        endif;
+        cnt = cnt + 1;
+    endwhile;
+    R0 = 0;
+    return;
+endif;
+
+// ---- Acquire Semaphore Function (num = 6) -------
+// Args: PID
+if ( functionNum == 6 ) then
+    alias currentPID R2;
+    // Find a free Entry in the Semaphore Table
+    alias cnt R5;
+    cnt = 0;
+    while( cnt < 32 ) do
+        if([SEMAPHORE_TABLE + cnt*4 +1] == 0) then
+            // Process Count = 1 and Locking Pid to -1, => not locked by any process, just acquired
+            [SEMAPHORE_TABLE + cnt*4 +1] = 1;
+            [SEMAPHORE_TABLE + cnt*4] = -1;
+            R0=cnt;
+            return;
+        endif;
+        cnt = cnt + 1;
+    endwhile;
+    // No free semaphore entry
+    R0=-1;
+    return;
+endif;
+
+// ---- Release Semaphore Function (num = 7) -------
+// Args: Semaphore_Table_Index, PID
+if ( functionNum == 7 ) then
+    alias SEM_TABLE_INDEX R2;
+    alias currentPID R3;
+
+    alias cnt R5;
+    // If the semaphore to be released (given by SEM_TABLE_INDEX) is locked by current process
+    if([SEMAPHORE_TABLE + SEM_TABLE_INDEX*4] == currentPID) then
+        // set Locking Pid to -1, Unlock
+        [SEMAPHORE_TABLE + SEM_TABLE_INDEX*4] = -1;
+        
+        // Loop Process Table to WakeUp all Prcoesses blocked by this semaphore 
+        cnt = 0;
+        while( cnt < 16 ) do
+            if([PROCESS_TABLE + cnt*16 + 4] == WAIT_SEMAPHORE && [PROCESS_TABLE + cnt*16 + 5] == SEM_TABLE_INDEX) then
+                [PROCESS_TABLE + cnt*16 + 4] = READY;
+            endif;
+            cnt = cnt + 1;
+        endwhile;
+    endif;
+
+    // Decrement the Process Count in Semaphore Table for the Corresponding Semaphore Entry
+    [SEMAPHORE_TABLE + SEM_TABLE_INDEX + 1] = [SEMAPHORE_TABLE + SEM_TABLE_INDEX + 1] - 1;
+    return;
+endif;
+
+
+// ---- Aquire Terminal Function (num = 8) ------
+// Args: PID
+if( functionNum == 8 ) then
+     alias currentPID R2;
+    // wait in a loop, BUSY WAIT
+    while([TERMINAL_STATUS_TABLE] == 1) do
+        [PROCESS_TABLE + currentPID*16 + 4] = WAIT_TERMINAL;
+        multipush(R1, R2);
+        // Scheduler
+		call SCHEDULER;
+		multipop(R1, R2);
+    endwhile;
+    // Update Terminal Status Table
+    [TERMINAL_STATUS_TABLE + 0] = 1;
+	[TERMINAL_STATUS_TABLE + 1] = currentPID;
+    // current process aquired the terminal now returns to the caller
+    return;
+
+endif;
+
+// ---- Release Terminal Function (num = 9) -----
+// Args: PID
+if( functionNum == 9 ) then
+     alias currentPID R2;
+    // check if the process trying to release is using in first place
+    if(currentPID == [TERMINAL_STATUS_TABLE + 1]) then
+        // reset state in Terminal Status Table 
+        [TERMINAL_STATUS_TABLE] = 0;
+        // update STATE of all processes whose STATE was Waiting Terminal to Ready
+        alias newPID R3;
+		newPID = 1;
+        while( newPID <= 15 ) do
+            if( [PROCESS_TABLE + (newPID * 16) + 4] == WAIT_TERMINAL ) then
+                [PROCESS_TABLE + (newPID * 16) + 4] = READY;
+            endif;
+            newPID = newPID + 1;
+        endwhile;
+        //assig
+        // breakpoint;
+        R0 = 0;
+        return;
+    else
+        // Store -1 in the Return value
+        R0 = -1;
+		return;
+    endif;
+endif;

@@ -1,0 +1,134 @@
+alias functionNum R1;
+
+//----- Get Free Page (funNum = 1) -----
+// Returns the page number of a free page
+// Called by fork and exec system calls. Also called by exception handler on page fault.
+
+if( functionNum == 1 ) then
+
+    //Increment WAIT_MEM_COUNT in system status table
+    [SYSTEM_STATUS_TABLE + 3] = [SYSTEM_STATUS_TABLE + 3] + 1;
+
+    //While memory is full (MEM_FREE_COUNT will be 0)---- BUSY LOOP
+    while( [SYSTEM_STATUS_TABLE + 2] == 0) do
+        [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 4] = WAIT_MEM;
+        //call module 5
+        multipush(R1);
+        call SCHEDULER;
+        multipop(R1);
+    endwhile ;
+
+    //Decrement MEM_FREE_COUNT & WAIT_MEM_COUNT in system status table
+    [SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] - 1;
+    [SYSTEM_STATUS_TABLE + 3] = [SYSTEM_STATUS_TABLE + 3] - 1;
+
+    //max mem usage
+    if (128 - [SYSTEM_STATUS_TABLE + 2] > [70*512 + 510] ) then
+        [70*512 + 510] = 128 - [SYSTEM_STATUS_TABLE + 2];
+    endif;
+
+    //Find a free page using memory free list
+    alias pageIdx R2;
+    pageIdx = 0;
+    while( pageIdx < 128 ) do
+        if( [MEMORY_FREE_LIST + pageIdx] == 0 ) then
+            R0 = pageIdx;
+            break;
+        endif ;
+        pageIdx = pageIdx + 1;
+    endwhile ;
+
+    [MEMORY_FREE_LIST + pageIdx] = 1;
+    
+    return;
+endif;
+
+// ---- Release Page -----
+if(functionNum == 2) then
+    alias releasePageNum R2;
+    // mem_free_list updated
+    [MEMORY_FREE_LIST + releasePageNum] = [MEMORY_FREE_LIST + releasePageNum] - 1;
+    // If the above page gets to 0, implies one more free page, incr mem_free_cnt in SYSTEM STATUS TABLE
+    if([MEMORY_FREE_LIST + releasePageNum] == 0) then
+		[SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] + 1;
+	endif;
+    //STATE field of Processes from WAIT_MEM to READY
+    alias var R3;
+    var = 0;
+    while( var < 16 ) do
+        if( [PROCESS_TABLE + 16*var + 4] ==  WAIT_MEM) then
+            [PROCESS_TABLE + 16*var + 4] = READY;
+        endif ;
+        var = var + 1;
+    endwhile ;
+    // breakpoint;
+    return;
+endif;
+
+// ---- Get Free Block ----------------
+// Args: none
+// returns :  A free Block or -1
+if(functionNum == 3) then
+    // Loop through the User Block Section of DISK FREE LIST and find a Free Space and return that index
+    alias cnt R4;
+    cnt =  DISK_FREE_AREA;
+    while( cnt < DISK_SWAP_AREA - 1) do
+        if([DISK_FREE_LIST + cnt] == 0) then
+            // free space found
+            [DISK_FREE_LIST + cnt] = 1;
+            R0 = cnt;
+            return;
+        endif;
+        cnt = cnt+1;
+    endwhile;
+    R0 = -1;
+    return;
+endif;
+
+
+// ---- Release Block -----------
+if(functionNum == 4) then
+    alias BlockNumber R2;
+    [DISK_FREE_LIST + BlockNumber] = [DISK_FREE_LIST + BlockNumber] - 1;
+	return;
+endif;
+
+// ---- Get Code Page -----------
+if(functionNum == 5) then
+    alias DiskBlockNumber R2;
+    // check Disk Map Table of ALL PROCESSES for the Given Disk Number
+    alias diskEntryCnt R5;
+    alias diskEntry R6;
+    alias diskOffset R7;
+    diskEntryCnt = 0;
+    while(diskEntryCnt <= 15) do
+        diskEntry = DISK_MAP_TABLE + diskEntryCnt*10;
+        diskOffset = 4;
+        while(diskOffset <= 7) do
+            if([diskEntry + diskOffset] == DiskBlockNumber && ([PAGE_TABLE_BASE + 20*diskEntryCnt + 2*diskOffset + 1] == "0100" || [PAGE_TABLE_BASE + 20*diskEntryCnt + 2*diskOffset + 1] == "1100" )) then
+                R0 = [PAGE_TABLE_BASE + 20*diskEntryCnt + 2*diskOffset];
+                [MEMORY_FREE_LIST + R0] = [MEMORY_FREE_LIST + R0] + 1;
+                // print(R0);
+                return;
+            endif;
+            diskOffset = diskOffset + 1;
+        endwhile;
+        diskEntryCnt = diskEntryCnt + 1;
+    endwhile;
+
+    // Mem Page Not Found, Call Get Free Page (FunNum=1, Mem Manager)
+    multipush(R1,R2,R5,R6,R7);
+	R1 = 1;
+	call MOD_2;
+	multipop(R1,R2,R5,R6,R7);
+    // Call Disk Load, Args: FunNum, PID, Page Number, Block Number
+	multipush(R0,R1,R2,R5,R6,R7);
+	R4 = DiskBlockNumber;
+	R3 = R0;
+    R2 = [SYSTEM_STATUS_TABLE + 1];
+    R1 = 2;
+	call MOD_4;
+	multipop(R0,R1,R2,R5,R6,R7);
+    breakpoint;
+    return;
+endif;

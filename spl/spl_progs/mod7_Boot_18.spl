@@ -1,0 +1,179 @@
+// ----- Load in ---------------
+
+// ----- Modules -----------
+
+// ---- module 0 ----
+loadi(40, 53);
+loadi(41, 54);
+
+// ---- module 1 ----
+loadi(42,55);
+loadi(43,56);
+
+// ---- module 2 ----
+loadi(44,57);
+loadi(45,58);
+
+// ---- module 4 ----
+loadi(48, 61);
+loadi(49, 62);
+
+// ---- module 5 ----
+loadi(50, 63);
+loadi(51, 64);
+
+// ----- Library ------
+loadi(63, 13);
+loadi(64, 14);
+
+// ----- Interrupts and Exeptions ----------------
+
+// ----- Timer Interrupt -------
+loadi(4, 17);
+loadi(5, 18);
+
+// ---- Console Interrupt ----
+loadi(8, 21);
+loadi(9, 22);
+
+// ---- Disk Interrupt ------
+loadi(6, 19);
+loadi(7, 20);
+
+// ---- INT6 -----
+loadi(14, 27);
+loadi(15, 28);
+
+// ----- INT7 -------
+loadi(16, 29);
+loadi(17, 30);
+
+// ----- INT9 -------
+loadi(20, 33);
+loadi(21, 34);
+
+// ---- INT10 ----
+loadi(22,35);
+loadi(23,36);
+
+// ----- Exception Handler ------
+loadi(2, 15);
+loadi(3, 16);
+
+// ---- Inode Table --------
+loadi(59, 3);
+loadi(60, 4);
+
+
+// ----- Programs ------
+
+// INIT PROG
+loadi(65, 7);
+loadi(66, 8);
+
+
+// ------ Page Tables ------
+
+// ----- Page Table INIT -------
+
+// PID = 1
+PTBR = PAGE_TABLE_BASE + 20;
+PTLR = 10;
+
+// Library
+[PTBR+0] = 63;
+[PTBR+1] = "0100";
+[PTBR+2] = 64;
+[PTBR+3] = "0100";
+
+// Heap
+[PTBR+4] = 78;
+[PTBR+5] = "0110";
+[PTBR+6] = 79;
+[PTBR+7] = "0110";
+
+
+// Code
+[PTBR+8] = 65;
+[PTBR+9] = "0100";
+[PTBR+10] = 66;
+[PTBR+11] = "0100";
+[PTBR+12] = -1;
+[PTBR+13] = "0000";
+[PTBR+14] = -1;
+[PTBR+15] = "0000";
+
+// Stack
+[PTBR+16] = 76;
+[PTBR+17] = "0110";
+[PTBR+18] = 77;
+[PTBR+19] = "0110";
+
+
+// ------ Process Tables --------------------------
+
+// ------ Process Table INIT -------
+
+    // PID
+    [PROCESS_TABLE + 16 + 1] = 1;
+    // STATE Field
+    [PROCESS_TABLE + 16 + 4] = CREATED;
+    // UArea Page
+    [PROCESS_TABLE + 16 + 11] = 80;
+    //UPTR (Logical Address for Top of User Stack)
+    [PROCESS_TABLE + 16 + 13] = 8 * 512;
+    // KPTR
+    [PROCESS_TABLE + 16 + 12] = 0; 
+    // PTBR_field
+    [PROCESS_TABLE + 16 + 14] = PAGE_TABLE_BASE + 20;
+    // PTLR_field
+    [PROCESS_TABLE + 16 + 15] = 10;
+
+
+// ---- STATE field of other process table entries to TERMINATED ----
+alias pidPro R0;
+pidPro = 2;
+while( pidPro < 16 ) do
+    [PROCESS_TABLE + 16*pidPro + 4] = TERMINATED;
+    pidPro = pidPro + 1;
+endwhile;
+
+// ----- Per Process Table for INIT ---------
+alias cnt R2;
+cnt = 0;
+while( cnt != 8 ) do
+    [[PROCESS_TABLE + 16 + 11]*512 + 496 + cnt*2] = -1;
+    cnt = cnt + 1;
+endwhile;
+
+
+// ----- Entry Points ------- 
+// ----- ENRTY POINT INIT -------
+[76*512] = [65 * 512 + 1];
+
+
+// ---- Initializations ----------------------------
+
+// ---- TERMINAL STATUS TABLE -----
+[TERMINAL_STATUS_TABLE] = 0;
+
+// ---- DISK STATUS TABLE -------
+[DISK_STATUS_TABLE] = 0;
+
+
+// ---- MEMORY_FREE_LIST, initial free pool starts from 83, occupied: INIT and IDLE
+alias counter R1;
+counter = 0;
+while(counter <= 82) do
+	[MEMORY_FREE_LIST + counter] = 1;
+	counter = counter + 1;
+endwhile;
+while(counter <= 127) do
+	[MEMORY_FREE_LIST + counter] = 0;
+	counter = counter + 1;
+endwhile;
+// wait_mem_cnt = 0, mem_free_count = initial free pool (127-82=45)
+[SYSTEM_STATUS_TABLE + 2] = 45;
+[SYSTEM_STATUS_TABLE + 3] = 0;
+
+return;

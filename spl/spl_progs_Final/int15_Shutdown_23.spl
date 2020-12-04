@@ -1,0 +1,69 @@
+// -------- Shutdown Syscall -----------------------------------------------------------------------------------
+// Args: None
+//---- Switch Stack -------------------------------------------
+alias userSP R1;
+[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+13] = SP;
+userSP = SP;
+SP = [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512-1;
+
+//---- Mode Flag ----------------------------------------------
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 21;
+
+
+if([SYSTEM_STATUS_TABLE + 1]!=1 || [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 3]!=1) then
+    // If the current process is not shell process
+    // OR the current user is not root user 
+    // return -1
+    alias physicalAddrRetVal R2;
+    physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
+    [physicalAddrRetVal] = -1;
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+    SP = userSP;
+    ireturn;
+endif;
+
+
+// Commit Changes made to:
+// INODE TABLE (along with User Table Pages(59-60) to Blocks(3-4))
+// Disk Free List (Page(61) to Block(2))
+// Root File (Page(62) to Block(5))
+
+// ----- Calling Disk Store Function in Device Manager -----------
+// Args: 
+// funNum = 1, PID, PageNum, BlockNum
+
+// INODE TABLE
+multipush(R1, R2);
+    R1 = 1;
+    R2 = [SYSTEM_STATUS_TABLE + 1];
+    R3 = 59;
+    R4 = 3;
+    call MOD_4;
+multipop(R1, R2);
+multipush(R1, R2);
+    R1 = 1;
+    R2 = [SYSTEM_STATUS_TABLE + 1];
+    R3 = 60;
+    R4 = 4;
+    call MOD_4;
+multipop(R1, R2);
+
+// Disk Free List
+multipush(R1, R2);
+    R1 = 1;
+    R2 = [SYSTEM_STATUS_TABLE + 1];
+    R3 = 61;
+    R4 = 2;
+    call MOD_4;
+multipop(R1, R2);
+
+// Root File
+multipush(R1, R2);
+    R1 = 1;
+    R2 = [SYSTEM_STATUS_TABLE + 1];
+    R3 = 62;
+    R4 = 5;
+    call MOD_4;
+multipop(R1, R2);
+
+halt;

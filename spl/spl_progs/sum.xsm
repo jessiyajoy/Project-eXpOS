@@ -1,0 +1,11 @@
+MOV R0, 20 ;counter
+MOV R1, 0 ;sum
+_IF:
+JZ R0, _ENDIF
+ADD R1, R0
+DCR R0
+JMP _IF
+_ENDIF:
+PORT P1, R1
+OUT
+HALT

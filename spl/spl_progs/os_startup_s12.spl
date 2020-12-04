@@ -1,0 +1,177 @@
+// Load in
+
+// Timer
+loadi(4, 17);
+loadi(5, 18);
+
+// Library
+loadi(63,13);
+loadi(64,14);
+
+// IDLE PROCESS
+
+loadi(69,11);
+loadi(70,12);
+
+// INIT PROG
+loadi(65, 7);
+loadi(66, 8);
+
+// INT7
+loadi(16,29);
+loadi(17,30);
+
+// INT10
+loadi(22,35);
+loadi(23,36);
+
+// Exception Handler
+loadi(2, 15);
+loadi(3, 16);
+
+
+// Page Table for IDLE
+
+
+// PID = 0
+PTBR = PAGE_TABLE_BASE;
+
+//Library
+[PTBR+0] = 63;
+[PTBR+1] = "0100";
+[PTBR+2] = 64;
+[PTBR+3] = "0100";
+
+//Heap
+[PTBR+4] = -1;
+[PTBR+5] = "0000";
+[PTBR+6] = -1;
+[PTBR+7] = "0000";
+
+//Code
+[PTBR+8] = 69;
+[PTBR+9] = "0100";
+[PTBR+10] = 70;
+[PTBR+11] = "0100";
+[PTBR+12] = -1;
+[PTBR+13] = "0000";
+[PTBR+14] = -1;
+[PTBR+15] = "0000";
+
+//Stack
+[PTBR+16] = 81;
+[PTBR+17] = "0110";
+[PTBR+18] = -1;
+[PTBR+19] = "0000";
+
+
+// Page Table INIT
+
+// PID = 1
+PTBR = PAGE_TABLE_BASE + 20;
+PTLR = 10;
+
+// Library
+[PTBR+0] = 63;
+[PTBR+1] = "0100";
+[PTBR+2] = 64;
+[PTBR+3] = "0100";
+
+// Heap
+[PTBR+4] = 78;
+[PTBR+5] = "0110";
+[PTBR+6] = 79;
+[PTBR+7] = "0110";
+
+
+// Code
+[PTBR+8] = 65;
+[PTBR+9] = "0100";
+[PTBR+10] = 66;
+[PTBR+11] = "0100";
+[PTBR+12] = -1;
+[PTBR+13] = "0000";
+[PTBR+14] = -1;
+[PTBR+15] = "0000";
+
+// Stack
+[PTBR+16] = 76;
+[PTBR+17] = "0110";
+[PTBR+18] = 77;
+[PTBR+19] = "0110";
+
+
+
+// Process Table IDLE
+
+    // PID
+    [PROCESS_TABLE + 1] = 0;
+
+    // UArea Page
+    [PROCESS_TABLE + 11] = 82;
+
+    // STATE Field
+    [PROCESS_TABLE + 4] = CREATED;
+
+    // UPTR (Logical Address for Top of User Stack)
+    [PROCESS_TABLE + 13] = 8 * 512;
+
+    // KPTR 
+    [PROCESS_TABLE + 12] = 0;
+
+    // PTBR_field
+    [PROCESS_TABLE + 14] = PAGE_TABLE_BASE;
+
+    // PTLR_field
+    [PROCESS_TABLE + 15] = 10;
+
+
+// Process Table INIT
+
+    // PID
+    [PROCESS_TABLE + 16 + 1] = 1;
+
+    // UArea Page
+    [PROCESS_TABLE + 16 + 11] = 80;
+
+    // STATE Field
+    [PROCESS_TABLE + 16 + 4] = RUNNING;
+
+    //UPTR (Logical Address for Top of User Stack)
+    [PROCESS_TABLE + 16 + 13] = 8 * 512;
+
+    // KPTR
+    [PROCESS_TABLE + 16 + 12] = 0; 
+
+    // PTBR_field
+    [PROCESS_TABLE + 16 + 14] = PAGE_TABLE_BASE + 20;
+
+    // PTLR_field
+    [PROCESS_TABLE + 16 + 15] = 10;
+
+
+
+
+// System Status Table
+
+// STORE PID 
+[SYSTEM_STATUS_TABLE + 1] = 1;
+
+
+
+// iret steps
+
+//entry point
+// IDLE
+[81 * 512] = [69*512 + 1];
+// INIT
+[76*512] = [65 * 512 + 1];
+
+
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 13];
+PTBR = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 14];
+PTLR = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 15];
+
+
+ireturn;
+  

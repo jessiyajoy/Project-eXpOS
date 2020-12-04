@@ -1,0 +1,102 @@
+// -------- Shutdown Syscall -----------------------------------------------------------------------------------
+// Args: None
+//---- Switch Stack -------------------------------------------
+alias userSP R1;
+[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+13] = SP;
+userSP = SP;
+SP = [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+11]*512-1;
+
+//---- Mode Flag ----------------------------------------------
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 21;
+
+//--- Authorization Check -------------------------------------------
+// If the current process is not SHELL process (PID = 2)
+// OR the current user is not ROOT USER
+if([SYSTEM_STATUS_TABLE + 1]!=2 || [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 3]!=1) then
+    // return -1
+    alias physicalAddrRetVal R2;
+    physicalAddrRetVal = [PTBR + 2 * (userSP-1)/512] * 512 + ((userSP-1)%512);
+    [physicalAddrRetVal] = -1;
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+    SP = userSP;
+    ireturn;
+endif;
+
+// --- Call KILL ALL function in PROCESS_MANAGER ----------------
+    // kill all proccesses except :
+    // idle, login and the current process(shell)
+    // ARGS:
+    // 1. FunNum (5)
+    // 2. Current PID
+	multipush(R1, R2);
+        R1 = 5;
+        R2 = [SYSTEM_STATUS_TABLE + 1];
+        call MOD_1;
+    multipop(R1, R2);
+    
+// -- Commit Changes Made to Dirty Buffers -------------------------------------------------
+	// Commit changes to the disk by calling the disk_store() function in the Device Manager module
+    // Loop through the Buffer Table
+    alias i R3;
+    i = 0;
+    while(i < MAX_BUFFER) do
+        // If Valid Entry(Block No. not -1) and If the buffer is dirty, Check DIRTY BIT
+        if([BUFFER_TABLE + i*4 + 0] != -1 && [BUFFER_TABLE + i*4 + 1] == 1) then
+            // writing back buffer pages, DISK STORE of Device Manager called
+            // Args: 1. funNum | 2. PID | 3. Page Num | 4. Block Num
+            multipush(R1, R2, R3);
+            R1 = DISK_STORE;
+            R2 = [SYSTEM_STATUS_TABLE + 1];
+            R4 = [BUFFER_TABLE + 4*i + 0];
+            R3 = BUFFER_BASE + i;
+            call MOD_4;
+            multipop(R1, R2, R3);
+        endif;
+        i = i + 1;
+    endwhile;
+
+// -- Commit Changes made to: -----------------------------------------------
+// 1. INODE TABLE (along with User Table Pages(59-60) to Blocks(3-4))
+// 2. Disk Free List (Page(61) to Block(2))
+// 3. Root File (Page(62) to Block(5))
+
+// ----- Calling Disk Store Function in Device Manager -----------
+// Args: 
+// funNum = 1, PID, PageNum, BlockNum
+
+// INODE TABLE
+multipush(R1, R2);
+    R1 = 1;
+    R2 = [SYSTEM_STATUS_TABLE + 1];
+    R3 = 59;
+    R4 = 3;
+    call MOD_4;
+multipop(R1, R2);
+multipush(R1, R2);
+    R1 = 1;
+    R2 = [SYSTEM_STATUS_TABLE + 1];
+    R3 = 60;
+    R4 = 4;
+    call MOD_4;
+multipop(R1, R2);
+
+// Disk Free List
+multipush(R1, R2);
+    R1 = 1;
+    R2 = [SYSTEM_STATUS_TABLE + 1];
+    R3 = 61;
+    R4 = 2;
+    call MOD_4;
+multipop(R1, R2);
+
+// Root File
+multipush(R1, R2);
+    R1 = 1;
+    R2 = [SYSTEM_STATUS_TABLE + 1];
+    R3 = 62;
+    R4 = 5;
+    call MOD_4;
+multipop(R1, R2);
+
+// Halt the Machine
+halt;

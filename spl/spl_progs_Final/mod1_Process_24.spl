@@ -1,0 +1,181 @@
+alias functionNum R1;
+alias PID R2;
+
+// ----- Get PCB Entry (funNum = 1) -----------
+if(functionNum == 1) then
+    alias cnt R10;
+    // Loop the process table to find free space and if found, set it up
+    cnt = 0;
+    while( cnt < 16 ) do
+        if([PROCESS_TABLE + cnt*16 + 4] == TERMINATED) then
+            // Set PID to index
+            [PROCESS_TABLE + cnt*16 + 1] = cnt;
+            // Set State
+            [PROCESS_TABLE + cnt*16 + 4] = ALLOCATED;
+            // Set PTBR and PTLR fields
+            [PROCESS_TABLE + cnt*16 + 14] = PAGE_TABLE_BASE + cnt*20;
+            [PROCESS_TABLE + cnt*16 + 15] = 10;
+            R0 = cnt;
+            return;
+        endif;
+        cnt = cnt + 1;
+    endwhile;
+    R0 = -1;
+    return;
+endif;
+
+// ----- Free User Area Page (funNum = 2) -----
+if(functionNum == 2) then
+    // Loop the Per Process Resource Table and calling Release Semaphore (Resource Manager) for every Valid Entry
+    alias cnt R5;
+    cnt = 0;
+    while( cnt < 8) do
+        // If valid entry
+        if([[PROCESS_TABLE + PID * 16 + 11] * 512 + 496 + 2*cnt] != -1) then
+            // if it's a FILE 
+            if([[PROCESS_TABLE + PID * 16 + 11] * 512 + 496 + 2*cnt] == FILE) then
+                //--- Call Close() from File Manager Module -----
+                // args: funNum(4), Open File Table Index
+                // returns: NIL
+                multipush(R1,R2,R5);
+                    R1 = 4;
+                    R2 = [[PROCESS_TABLE + PID * 16 + 11] * 512 + 496 + 2*cnt + 1];
+                    call FILE_MANAGER;
+                multipop(R1,R2,R5);
+            endif;
+            // If it's a Semaphore
+            if([[PROCESS_TABLE + PID * 16 + 11] * 512 + 496 + 2*cnt] == 1) then
+                // calling Release Semaphore Function (Resource Manager)
+                multipush(R1,R2,R5);
+                R3 = PID;
+                R1 = 7;
+                R2 = [[PROCESS_TABLE + PID * 16 + 11] * 512 + 496 + 2*cnt + 1];
+                call MOD_0;
+                multipop(R1,R2,R5);
+            endif;
+            // Invalidate the entry
+            [[PROCESS_TABLE + PID * 16 + 11] * 512 + 496 + 2*cnt] = -1;
+        endif;
+        cnt = cnt + 1;
+    endwhile;
+
+    // calling Release Page (2), Args: funNum, User Area Page Number to free (get from Process Table)
+	multipush(R1,R2);
+	R1 = 2;
+	R2 = [PROCESS_TABLE + PID*16 + 11];
+	call MOD_2;
+	multipop(R1,R2);
+	return;
+endif;
+
+// ----- Exit Process (funNum = 3) ----
+if(functionNum == 3) then
+
+    // Loop through Process Table Entries and Set to Ready and Mark Orphan Appropriately
+    // NOT VALID when called through EXEC
+    if([PROCESS_TABLE + PID*16 + 9] != 9) then
+        alias cnt R5;
+        cnt = 0;
+        while( cnt < 16 ) do
+            if([PROCESS_TABLE + cnt*16 + 4] == WAIT_PROCESS && [PROCESS_TABLE + cnt*16 + 5] == PID) then
+                [PROCESS_TABLE + cnt*16 + 4] = READY;
+            endif;
+            if([PROCESS_TABLE + cnt*16 + 2] == PID) then
+                [PROCESS_TABLE + cnt*16 + 2] = -1;
+            endif;
+            cnt = cnt + 1;
+        endwhile;
+    endif;
+
+    // Free Page Table (4), ARGS: funNum, PID
+	multipush(R1,R2);
+	R1 = 4;
+	R2 = PID;
+	call MOD_1;
+	multipop(R1,R2);
+    // Free User Area Page, ARGS: funNum, PID
+	multipush(R1,R2);
+	R1 = 2;
+	R2 = PID;
+	call MOD_1;
+	multipop(R1,R2);
+    // Set State
+	[PROCESS_TABLE + PID*16 + 4] = TERMINATED;
+	return;
+
+endif;
+
+// ---- Free Page Table (funNum = 4) ----
+if(functionNum == 4) then
+    PTBR = PAGE_TABLE_BASE + PID*20;
+
+    // Library Invalidated
+    [PTBR + 0] = -1;
+	[PTBR + 1] = "0000";
+	[PTBR + 2] = -1;
+	[PTBR + 3] = "0000";
+
+    // Heap, Code, Stack Freed
+    alias counter R4;
+    counter = 4;
+    while(counter<20) do
+        if([PTBR + counter] != -1) then
+            // calling Release Page
+            multipush(R1,R2,R4);
+            R1 = 2;
+            R2 = [PTBR + counter];
+            call MOD_2;
+            [PTBR + counter] = -1;
+            [PTBR + counter+1] = "0000";
+            multipop(R1,R2,R4);
+        endif;
+        counter = counter + 2;
+    endwhile;
+
+    // Check Disk Map Table for Any Temporary Disk Block Allocations for Stack/Heap
+    // Heaps:
+    if([DISK_MAP_TABLE + PID*10 + 2] != -1) then
+        // Call Release Block Function (FunNum = 4, Memory Manager)
+        // ARGS: FunNum, Block Number, PID
+		multipush(R1,R2,R3,R4);
+		R3 = PID;
+		R2 = [DISK_MAP_TABLE + PID*10 + 2];
+        R1 = 4;
+		call MOD_2;
+		multipop(R1,R2,R3,R4);
+	endif;
+	if([DISK_MAP_TABLE + PID*10 + 3] != -1) then
+		multipush(R1,R2,R3,R4);
+		R3 = PID;
+		R2 = [DISK_MAP_TABLE + PID*10 + 3];
+        R1 = 4;
+		call MOD_2;
+		multipop(R1,R2,R3,R4);
+	endif;
+
+    // Stacks:
+    if([DISK_MAP_TABLE + PID*10 + 8] != -1) then
+        multipush(R1,R2,R3,R4);
+        R3 = PID;
+        R2 = [DISK_MAP_TABLE + PID*10 + 8];
+        R1 = 4;
+        call MOD_2;
+        multipop(R1,R2,R3,R4);
+	endif;
+    if([DISK_MAP_TABLE + PID*10 + 9] != -1) then
+        multipush(R1,R2,R3,R4);
+        R3 = PID;
+        R2 = [DISK_MAP_TABLE + PID*10 + 9];
+        R1 = 4;
+        call MOD_2;
+        multipop(R1,R2,R3,R4);
+	endif;
+
+    // Invalidate the DISK MAP TABLE for this Process 
+	counter = 0;
+	while(counter <= 9) do
+		[DISK_MAP_TABLE + PID*10 + counter] = -1;
+        counter = counter + 1;
+	endwhile;
+    return;
+endif;

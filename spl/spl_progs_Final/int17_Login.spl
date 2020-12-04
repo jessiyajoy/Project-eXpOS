@@ -1,0 +1,103 @@
+// ------------- LOGIN SYSCALL ------------------------------------------------------------------------------
+// Arguments: 
+// 1.User name
+// 2.Password
+// Returns:
+// 0	:Success
+// -1	:Invalid username or password
+// -2	:Permission denied
+
+//---------- Set the Mode Flag for LOGIN = 27 ------------------------------ 
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 27;
+
+// Store UserSp in a Variable
+alias userSP R2;
+userSP = SP;
+
+//------------- Switch Stacks ----------------------------------------------------
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13] = SP;
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1]) * 16 + 11] * 512 -1;
+
+alias currPID R4;
+currPID = [SYSTEM_STATUS_TABLE + 1];
+
+alias physicalAddrRetVal R3;
+physicalAddrRetVal = ([PTBR + 2 * (userSP - 1)/ 512] * 512) + ((userSP - 1) % 512);
+
+alias processEntry R5;
+processEntry = PROCESS_TABLE + currPID * 16;
+
+alias username R7;
+alias password R8;
+
+// Get Args
+username = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 4)/ 512] * 512 + ((userSP - 4) % 512)];
+password = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 3)/ 512] * 512 + ((userSP - 3) % 512)];
+
+// -- If Current Process PID != 1  ----------------------
+// Log Syscall Only From Login Process
+// * Login Process has PID = 1 * //
+if(currPID != 1) then
+    // return -2
+    [physicalAddrRetVal] = -2;
+    [processEntry + 9] = 0;
+    SP = userSP;
+    ireturn;
+endif;
+
+// -- Get User Table Entry for the USERNAME -----------------
+alias userid R6;
+userid = 0;
+while(userid < MAX_USER_NUM) do
+    if([USER_TABLE + userid*2] == username) then
+        break;
+    endif;
+    userid = userid + 1;
+endwhile;
+// If No User Found, return -1
+if(userid == MAX_USER_NUM) then
+    [physicalAddrRetVal] = -1;
+    [processEntry + 9] = 0;
+    SP = userSP;
+    ireturn;
+endif;
+
+// -- Encrypt the Given Password ------------------------------
+encrypt password;
+
+// -- If Encrypted Password Mismatch ------------------------
+// encypted input password does not match the ENCRYPTED PASSWORD field in the user table entry
+
+if( [USER_TABLE + userid*2 + 1] != password ) then
+    // return -1
+    [physicalAddrRetVal] = -1;
+    [processEntry + 9] = 0;
+    SP = userSP;
+    ireturn;
+endif;
+
+// -- SETTING UP OF SHELL PROCESS --------------------------------------------
+// State of SHELL to CREATED
+[PROCESS_TABLE + 16*2 + 4] = CREATED;
+
+// USERID in shell to currently loggedin user
+[PROCESS_TABLE + 16*2 + 3] = userid;
+
+// -- Setting STATE of LOGIN to WAIT_PROCESS ---------------------------------------------------------
+// State to (WAIT_PROCESS, 2)
+//* Login waits for shell to exit *//
+[processEntry + 4] = WAIT_PROCESS;
+[processEntry + 5] = 2;
+
+// -- Set CURRENT_USER_ID field in System Status Table to Userid-------------------------------------------------
+[SYSTEM_STATUS_TABLE] = userid;
+
+multipush(R2,R3,R4,R5,R6,R7,R8);
+    call SCHEDULER;
+multipop(R2,R3,R4,R5,R6,R7,R8);
+
+// -- Return 0, Success --------------------------------------------------------------------------------------------------
+[physicalAddrRetVal] = 0;
+[processEntry + 9] = 0;
+SP = userSP;
+ireturn;

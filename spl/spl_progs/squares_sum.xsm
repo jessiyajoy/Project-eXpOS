@@ -1,0 +1,21 @@
+MOV R0, 20 
+MOV R1, 1  
+MOV R2, 0 
+_while:
+    JZ R0, _endwhile
+    BRKP
+    MOV R3, R1
+    MUL R3, R1
+    ADD R2, R3
+    PORT P1, R3
+    OUT
+
+    DCR R0
+    INR R1
+
+JMP _while
+
+_endwhile:
+PORT P1, R2
+OUT
+HALT

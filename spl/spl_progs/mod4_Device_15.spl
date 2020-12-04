@@ -1,0 +1,27 @@
+alias functionNum R1;
+alias currentPID R2;
+
+// ---- Terminal Write Function (num = 3) ----
+
+if(functionNum == 3) then
+// Acquire Terminal First
+    multipush(R1, R2, R3);
+    R1 = 8;
+    R2 = currentPID;
+    // Call Resource Manager
+    call MOD_0;
+    multipop(R1, R2, R3);
+    // Print the word in R3
+    print(R3);
+
+// Release Terminal Now
+    multipush(R1, R2, R3);
+    R1 = 9;
+	R2 = currentPID;
+    // Call Resource Manager 
+	call MOD_0;
+	multipop(R1, R2, R3);
+	return;
+else
+    return;
+endif;

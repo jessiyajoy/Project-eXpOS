@@ -1,0 +1,21 @@
+load --os ../spl/spl_progs/os_startup.xsm
+load --init ../expl/expl_progs/Shell2.xsm
+load --idle ../expl/expl_progs/idle_st12.xsm
+load --module 0 ../spl/spl_progs/resourcemanager0.xsm
+load --module 1 ../spl/spl_progs/processmanager1_st21.xsm
+load --module 2 ../spl/spl_progs/memorymanager2.xsm
+load --module 4 ../spl/spl_progs/devicemanager4.xsm
+load --module 5 ../spl/spl_progs/scheduler5_st20.xsm
+load --module 7 ../spl/spl_progs/bootmodule7.xsm
+load --int=6 ../spl/spl_progs/int6.xsm
+load --int=7 ../spl/spl_progs/int7.xsm
+load --int=8 ../spl/spl_progs/int8_st20.xsm
+load --int=9 ../spl/spl_progs/int9.xsm
+load --int=10 ../spl/spl_progs/int10.xsm
+load --int=11 ../spl/spl_progs/int11.xsm
+load --int=15 ../spl/spl_progs/haltprog.xsm
+load --int=timer ../spl/spl_progs/timer.xsm
+load --int=console  ../spl/spl_progs/console.xsm
+load --int=disk  ../spl/spl_progs/diskint.xsm
+load --exhandler ../spl/spl_progs/exception_handler.xsm
+load --library ../expl/library.lib

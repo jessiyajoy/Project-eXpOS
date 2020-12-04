@@ -1,0 +1,44 @@
+// MODE FLAG = 7
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 7;
+
+alias userSP R0;
+userSP = SP;
+
+// Switch Stack
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13] = SP;
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 - 1;
+
+// fileDescriptor
+alias fileDescriptor R1;
+fileDescriptor= [([PTBR + 2 * ((userSP - 4) / 512)] * 512) + (userSP - 4) % 512];
+
+if (fileDescriptor != -1)
+then
+    // return -1 if invalid
+	 alias physicalAddrRetVal R2;
+	 physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
+	 [physicalAddrRetVal] = -1;
+else
+	 alias word R3;
+	 word = [[PTBR + 2 * ((userSP - 3) / 512)] * 512 + ((userSP - 3) % 512)];
+	 
+	 multipush(R0, R1, R2, R3);
+
+	 R1 = 4;
+	 R2 = [SYSTEM_STATUS_TABLE + 1];
+	 R3 = word;
+
+	 call MOD_4;
+
+	 multipop(R0, R1, R2, R3);
+	 
+     // return 0 for success
+	 alias physicalAddrRetVal R2;
+	 physicalAddrRetVal = ([PTBR + 2 * (userSP - 1)/ 512] * 512) + ((userSP - 1) % 512);
+	 [physicalAddrRetVal] = 0;
+
+endif;
+
+SP = userSP;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+ireturn;

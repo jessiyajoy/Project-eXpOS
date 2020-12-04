@@ -1,0 +1,19 @@
+load --init ../expl/expl_progs14/forkingLLAssig.xsm
+load --os ../spl/spl_progs/os_startup_14.xsm
+load --module 7 ../spl/spl_progs20/mod7_Boot_20.xsm
+load --module 5 ../spl/spl_progs20/mod5_Scheduler_20.xsm
+load --module 4 ../spl/spl_progs20/mod4_Device_18.xsm
+load --module 2 ../spl/spl_progs20/mod2_Memory_19.xsm
+load --module 1 ../spl/spl_progs20/mod1_Process_20.xsm
+load --module 0 ../spl/spl_progs20/mod0_Resource_18.xsm
+load --int=10 ../spl/spl_progs20/int10_s20.xsm
+load --exhandler ../spl/spl_progs20/exception_handler.xsm
+load --library ../expl/library.lib
+load --int=timer ../spl/spl_progs20/timers14.xsm
+load --int=9 ../spl/spl_progs20/int9_Exec_19.xsm
+load --int=8 ../spl/spl_progs20/int8_s20.xsm
+load --int=7 ../spl/spl_progs20/int7_s15.xsm
+load --int=6 ../spl/spl_progs20/int6_s16.xsm
+load --int=console ../spl/spl_progs20/console_int_16.xsm
+load --int=disk ../spl/spl_progs20/disk_int_18.xsm
+load --idle ../expl/expl_progs/idleprog.xsm

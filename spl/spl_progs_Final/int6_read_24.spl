@@ -1,0 +1,160 @@
+
+//-------------------------------------- READ SYSCALL ----------------------------------- //
+// MODE FLAG = Syscall Num => 7
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 7;
+
+alias userSP R10;
+userSP = SP;
+
+// Switch Stack
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13] = SP;
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 - 1;
+
+alias physicalAddrRetVal R2;
+physicalAddrRetVal = ([PTBR + 2 * (userSP - 1)/ 512] * 512) + ((userSP - 1) % 512);
+
+// fileDescriptor
+alias fileDescriptor R11;
+fileDescriptor= [([PTBR + 2 * ((userSP - 4) / 512)] * 512) + (userSP - 4) % 512];
+
+alias word_addr R3;
+word_addr = [[PTBR + 2 * ((userSP - 3) / 512)] * 512 + ((userSP - 3) % 512)];
+
+if (fileDescriptor == -1) then
+    //-------- TERMINAL READ ---------------------------------------------
+    //-------- Call Terminal Read Function in Device Manager --------
+    multipush(R10, R1, R2, R3);
+    R1 = 4;
+    R2 = [SYSTEM_STATUS_TABLE + 1];
+    R3 = word_addr;
+    call MOD_4;
+    multipop(R10, R1, R2, R3);
+    // return 0 for success
+    [physicalAddrRetVal] = 0;
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+    SP = userSP;
+    ireturn;
+else
+    //--------  File Read ---------------------------------------------
+    // Validity of fileDescriptor
+    if(fileDescriptor < 0 || fileDescriptor > 7) then
+        //return -1
+        [physicalAddrRetVal] = -1;
+        [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+        SP = userSP;
+        ireturn;
+    endif;
+
+    alias perProcessEntry R4;
+    perProcessEntry = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11]*512 + RESOURCE_TABLE_OFFSET + fileDescriptor*2;
+
+    // /* No file is open with this file descriptor. */
+    // if Resource Id of perProcessTable Entry is not File OR Invalid
+    if([perProcessEntry + 0] == -1 || [perProcessEntry + 0] != FILE) then
+        //return -1
+        [physicalAddrRetVal] = -1;
+        [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+        SP = userSP;
+        ireturn; 
+    endif;
+
+    alias openFileTableIndex R5; 
+    alias inodeindex R6;
+    openFileTableIndex = [perProcessEntry + 1];
+    inodeindex = [OPEN_FILE_TABLE + openFileTableIndex*4];
+
+    // /* Lock the inode */
+    // Calling Acquire_Inode() Resource Manager
+    // Args:
+    // funNum = 4, inodeTableIndex, PID
+    multipush(R1,R2,R3,R4,R5,R6,R10,R11);
+        R1 = 4;
+        R2 = inodeindex;
+        R3 = [SYSTEM_STATUS_TABLE + 1];
+        call MOD_0;
+    multipop(R1,R2,R3,R4,R5,R6,R10,R11);
+    if(R0 == -1) then
+        //return -1
+        [physicalAddrRetVal] = -1;
+        [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+        SP = userSP;
+        ireturn;
+    endif;
+
+    alias lseek_addr R7;
+    lseek_addr = OPEN_FILE_TABLE + openFileTableIndex*4 + 2;
+
+    // word_addr logical to physical
+    alias physicalAddrInput R12;
+    physicalAddrInput = ([PTBR + 2 * (word_addr / 512)] * 512) + (word_addr % 512);
+
+    if([OPEN_FILE_TABLE +  openFileTableIndex*4 + 0] == INODE_ROOT) then
+        // If file is Root File (check OPEN_FILE_TABLE's Inode Index Field (0))
+        if([lseek_addr] >= 480) then
+            // if lseek == size of root file
+            // Calling Release_Inode() Resource Manager otherwise
+            // Args:
+            // funNum = 5, inode Table Index, PID
+            multipush(R1,R2,R3,R4,R5,R6,R7,R10,R11);
+                R1 = 5;
+                R2 = inodeindex;
+                R3 = [SYSTEM_STATUS_TABLE + 1];
+                call MOD_0;
+            multipop(R1,R2,R3,R4,R5,R6,R7,R10,R11);
+            //return -2, End Of File EOF, reached
+            [physicalAddrRetVal] = -2;
+            [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+            SP = userSP;
+            ireturn;
+        endif;
+        // Reading Word from LSEEK position of ROOT_FILE, and incr LSEEK
+        [physicalAddrInput] = [ROOT_FILE + [lseek_addr]];
+        [lseek_addr] = [lseek_addr] + 1;
+    else
+        // File is not Root File
+        if([lseek_addr] >= [INODE_TABLE + 16*inodeindex + 2]) then
+            // EOF Reached
+            // Calling Release_Inode() Resource Manager otherwise
+            // Args: funNum = 5, inodeTableIndex, PID
+            multipush(R1,R2,R3,R4,R5,R6,R7,R10,R11);
+                R1 = 5;
+                R2 = inodeindex;
+                R3 = [SYSTEM_STATUS_TABLE + 1];
+                call MOD_0;
+            multipop(R1,R2,R3,R4,R5,R6,R7,R10,R11);
+            //return -2, End Of File EOF, reached
+            [physicalAddrRetVal] = -2;
+            [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+            SP = userSP;
+            ireturn;
+        endif;
+        // Read from File Buffer by calling the buffered_read(2) in File Manager module
+        // Args: FunNum = 2, Disk Block Number, Offset, Memory Address
+        // returns: NIL
+        multipush(R1,R2,R3,R4,R5,R6,R7,R10,R11,R12);
+            R1 = 2;
+            R2 = [INODE_TABLE+ 16*inodeindex + 8 + ([lseek_addr]/512)];
+            R3 = [lseek_addr]%512;
+            R4 = physicalAddrInput;
+            call FILE_MANAGER;
+        multipop(R1,R2,R3,R4,R5,R6,R7,R10,R11,R12);
+        [lseek_addr] = [lseek_addr] + 1;
+    endif;
+    // Calling Release_Inode() Resource Manager otherwise
+    // Args:r
+    // funNum = 5, inode Table Index, PID
+    multipush(R1,R2,R3,R4,R5,R6,R7,R10,R11,R12);
+        R1 = 5;
+        R2 = inodeindex;
+        R3 = [SYSTEM_STATUS_TABLE + 1];
+        call MOD_0;
+    multipop(R1,R2,R3,R4,R5,R6,R7,R10,R11,R12);
+    //return 0
+    [physicalAddrRetVal] = 0;
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+    SP = userSP;
+    ireturn;
+endif;
+SP = userSP;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+ireturn;

@@ -1,0 +1,8 @@
+alias i R0;
+alias res R1;
+
+while(i<=20) do
+	res = res + (i*i);
+	i = i + 1;
+endwhile;
+print(res);

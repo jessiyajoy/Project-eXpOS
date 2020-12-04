@@ -1,0 +1,53 @@
+alias functionNum R1;
+alias currentPID R2;
+
+// ---- Aquire Terminal Function (num = 8) ------
+if( functionNum == 8 ) then
+    // wait in a loop (BUSY WAIT)
+    while([TERMINAL_STATUS_TABLE + 0] == 1) do
+        
+        [PROCESS_TABLE + currentPID * 16 + 4] = WAIT_TERMINAL;
+        multipush(R1,R2);
+        // Call Scheduler for Scheduling other Process
+		call SCHEDULER;
+		multipop(R1,R2);
+
+    endwhile;
+    // use the Terminal, Update Terminal Status Table
+
+    [TERMINAL_STATUS_TABLE + 0] = 1;
+	[TERMINAL_STATUS_TABLE + 1] = currentPID;
+
+    //assig
+    // breakpoint;
+
+    // current process aquired the terminal now returns to the caller
+    return;
+
+endif;
+
+// ---- Release Terminal Function (num = 9) -----
+if( functionNum == 9 ) then
+// check if the process trying to release is using in first place
+    if(currentPID == [TERMINAL_STATUS_TABLE + 1]) then
+        // reset state in Terminal Status Table 
+        [TERMINAL_STATUS_TABLE + 0] = 0;
+        // update STATE of all processes whose STATE was Waiting Terminal to Ready
+        alias newPID R3;
+		newPID = 1;
+        while( newPID <= 15 ) do
+            if( [PROCESS_TABLE + (newPID * 16) + 4] == WAIT_TERMINAL ) then
+                [PROCESS_TABLE + (newPID * 16) + 4] = READY;
+            endif;
+            newPID = newPID + 1;
+        endwhile;
+        //assig
+        // breakpoint;
+        R0 = 0;
+        return;
+    else
+        // Store -1 in the Return value
+        R0 = -1;
+		return;
+    endif;
+endif;

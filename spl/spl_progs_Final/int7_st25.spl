@@ -1,0 +1,200 @@
+
+// WRITE SYSTEM CALL
+
+// Arguments: File Descriptor(Integer) and the word to be written
+// Return Value:
+//  0	Success
+// -1	File Descriptor given is invalid
+// -2	No disk space / File Full
+// -3	Permission denied
+
+
+alias processEntry R15;
+processEntry = PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16;
+
+
+//system mode
+[processEntry + 9] = 5;
+
+//save user SP for further use
+alias userSP R5;
+userSP = SP;
+
+//save user stack ptr in prcoess table UPTR
+[processEntry + 13] = SP;
+
+//set SP to KPTR
+SP = [processEntry + 11] * 512 - 1;
+
+alias fileDesc R6;
+fileDesc = [([PTBR + 2*((userSP-4)/512)]*512) + ((userSP-4)%512)];
+
+//if fileDescriptor is terminal(=-1) extract arg 2 from userSP - 3, print it, store 0(success) return value at userSP - 1
+
+if (fileDesc == -2) then
+
+    alias word R7;
+	word = [[PTBR + 2 * ((userSP - 3) / 512)] * 512 + ((userSP - 3) % 512)];
+
+    //invoke Terminal Write function
+    R1 = TERMINAL_WRITE;
+    R2 = [SYSTEM_STATUS_TABLE + 1];
+    R3 = word;
+    multipush(R7, R6, R5, R15);
+    call DEVICE_MANAGER;
+    multipop(R7, R6, R5, R15);
+    //print [SYSTEM_STATUS_TABLE+1];
+	[([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = 0;
+    goto end;
+
+else
+
+    //If file descriptor (not in range 0 to 7)  is invalid, return -1. 
+    if (fileDesc < 0 || fileDesc > 7) then
+        [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
+        goto end;
+    endif;
+
+    alias word R7;
+    word = [[PTBR + 2 * ((userSP - 3) / 512)] * 512 + ((userSP - 3) % 512)];
+
+    alias resourceTableEntry R8;
+    resourceTableEntry = [processEntry+11]*512 + RESOURCE_TABLE_OFFSET + 2*fileDesc;
+
+    // resource identifier field Resource Table entry is not file, return -1
+    if( [resourceTableEntry] != FILE ) then
+        [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
+        goto end;
+    endif ;
+
+    // Get the index of the Open File Table entry from the Per Process Resource Table entry.
+    alias openFileTableEntry R9;
+    openFileTableEntry = OPEN_FILE_TABLE + 4*[resourceTableEntry + 1];
+
+    // Get the index of the Inode Table entry from the Open File Table entry. 
+    alias inodeIndex R10;
+    inodeIndex = [openFileTableEntry];
+
+    alias inodeEntry R11;
+    inodeEntry = INODE_TABLE +16*inodeIndex;
+
+    if([inodeEntry + 4] == EXCLUSIVE) then
+        if( [processEntry + 3] != 1 && [processEntry + 3] != [inodeEntry + 3]) then
+            // user has no permission to delete file, return -1
+            [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -3;
+            goto end;
+        endif ;
+    endif;
+    
+    // lock file
+    // CALL ACQUIRE_INODE, RESOURCE MANAGER 0
+    R1 = ACQUIRE_INODE;
+    R2 = inodeIndex;
+    R3 = [SYSTEM_STATUS_TABLE+1];
+    multipush(R5, R6, R7, R8, R9, R10, R11, R15);
+    call RESOURCE_MANAGER;
+    multipop(R5, R6, R7, R8, R9, R10, R11, R15);
+
+    //locking fails
+    if(R0 == -1) then
+        [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -1;
+        goto end;
+    endif;
+
+    alias lseek R12;
+    lseek = [openFileTableEntry + 2];
+
+    // If lseek position is same as the MAX_FILE_SIZE, release_inode() and return -2.  ( Maximum file size of 2048 reached )
+    if(lseek == MAX_FILE_SIZE) then
+        // release lock on file
+        // call RELEASE_INODE, RESOURCE MANAGER 
+        R1 = RELEASE_INODE	;
+        R2 = inodeIndex;
+        R3 = [SYSTEM_STATUS_TABLE+1];
+        multipush(R5, R15);
+        call RESOURCE_MANAGER;
+        multipop(R5, R15);
+        [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -2;
+        goto end;
+    endif;
+
+    // If the Lseek position is a multiple of 512 and the same as File size in the inode table (New block to be allocated ) 
+    if(lseek%512 == 0 && lseek == [inodeEntry + 2]) then
+
+        // Get a free disk block by calling the get_free_block() function in the Memory Manager module.
+        R1 = GET_FREE_BLOCK	;
+        multipush(R5, R6, R7, R8, R9, R10, R11, R12);
+        call  MEMORY_MANAGER;
+        multipop(R5, R6, R7, R8, R9, R10, R11, R12);
+
+        // If no free disk block is found release_inode() and return -2. 
+        if(R0 == -1) then
+            // release lock on file
+            // call RELEASE_INODE, RESOURCE MANAGER 
+            R1 = RELEASE_INODE	;
+            R2 = inodeIndex;
+            R3 = [SYSTEM_STATUS_TABLE+1];
+            multipush(R5, R15);
+            call RESOURCE_MANAGER;
+            multipop(R5, R15);
+            [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = -2;
+            goto end;
+        endif;
+
+        // Set the new disk block found in the corresponding (lseek / 512) disk block field  in the Inode table entry
+        [inodeEntry + 8 + lseek/512] = R0;
+
+    endif;
+
+    // Find the disk block number and the position in the block from which input is to be written.
+
+    // Get the block index from lseek position
+    alias diskBlockIndex R0; //only needed to get disk block , hence in R10
+    diskBlockIndex = lseek/512;
+
+    // Get the disk block number corresponding to the block index from the Inode Table
+    alias diskBlockNumber R13;
+    diskBlockNumber = [inodeEntry + 8 + diskBlockIndex];
+
+    //Get the offset value from lseek position
+    alias offset R14;
+    offset = lseek%512;
+
+    // Write the word to the File Buffer
+    //buffered_write() function in File Manager module
+    R1 = BUFFERED_WRITE;
+    R2 = diskBlockNumber;
+    R3 = offset;
+    R4 = word;
+    multipush(R5, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15);
+    call FILE_MANAGER;
+    multipop(R5, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15);
+
+    // If Lseek equals file size, increment file size in the inode table entry and also in the memory copy of the root file.
+    if(lseek == [inodeEntry + 2]) then
+        [inodeEntry + 2] = [inodeEntry + 2] + 1;
+        [ROOT_FILE + 8*inodeIndex + 1] = [ROOT_FILE + 8*inodeIndex + 1] + 1;
+    endif;
+
+    // Increment the Lseek position in the Open File Table entry.
+    [openFileTableEntry + 2] = [openFileTableEntry + 2] + 1;
+
+    // Release the Lock on the File
+    // call RELEASE_INODE, RESOURCE MANAGER 
+    R1 = RELEASE_INODE	;
+    R2 = inodeIndex;
+    R3 = [SYSTEM_STATUS_TABLE+1];
+    multipush(R5, R15);
+    call RESOURCE_MANAGER;
+    multipop(R5, R15);
+
+    [([PTBR + 2*((userSP-1)/512)]*512) + ((userSP-1)%512)] = 0;
+    goto end;
+
+endif;
+
+
+end : 
+SP = userSP;
+[processEntry + 9] = 0;
+ireturn;

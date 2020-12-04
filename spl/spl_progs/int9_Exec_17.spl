@@ -1,0 +1,129 @@
+//Switch Stacks
+alias userSP R0;
+userSP = SP;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13] = SP;
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11]*512 -1;
+
+// Set ModeFlag
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 9;
+
+// Get Filename
+alias fileName R1;
+fileName = [[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 4)/ 512] * 512 + ((userSP - 4) % 512)];
+
+// inode search for file
+alias file R2;
+file = 0;
+while(file <= 59) do
+	if(([INODE_TABLE + file*16 + 1] == fileName) && ([INODE_TABLE + file*16] == EXEC)) then
+		break;
+	else
+		file = file + 1;
+	endif;
+endwhile;
+
+// file not found
+if(file == 60) then
+	[[PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1]*20 + 2 * (userSP - 1)/ 512] * 512 + ((userSP - 1) % 512)] = -1;
+	SP = userSP;
+	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 0;
+	ireturn;
+endif;
+
+// file found, Call Exit process
+multipush(R0,R1,R2);
+// ARGS: funNum and PID
+R1 = 3;
+R2 = [SYSTEM_STATUS_TABLE + 1];
+call MOD_1;
+multipop(R0,R1,R2);
+
+// Get UArea Page Number
+alias UAreaPage R3;
+UAreaPage = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11];
+
+// Incr mem free list entry, decrement mem_free_cnt in sys status  
+[MEMORY_FREE_LIST + UAreaPage] = [MEMORY_FREE_LIST + UAreaPage] + 1;
+[SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] - 1;
+
+// new process kernel stack
+SP = UAreaPage * 512 - 1;
+
+// process table: STATE(4) and Inode_index Field (7)
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 4] = RUNNING;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 7] = file;
+
+// Page Table Set Up
+PTBR = PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1] * 20;
+
+// library
+[PTBR + 0] = 63;
+[PTBR + 1] = "0100";
+[PTBR + 2] = 64;
+[PTBR + 3] = "0100";
+
+// Stack, calling Get Free Page function (funNum = 1)
+multipush(R0,R1,R2,R3);
+R1 = 1;
+call MOD_2;
+[PTBR + 16] = R0;
+[PTBR + 17] = "0110";
+call MOD_2;
+[PTBR + 18] = R0;
+[PTBR + 19] = "0110";
+
+// Heap, calling Get Free Page function (funNum = 1)
+call MOD_2;
+[PTBR+4] = R0;
+[PTBR+5] = "0110";
+call MOD_2;
+[PTBR+6] = R0;
+[PTBR+7] = "0110";
+
+multipop(R0,R1,R2,R3);
+
+// Code Pages
+
+[PTBR+8] = -1;
+[PTBR+9] = "0000";
+[PTBR+10] = -1;
+[PTBR+11] = "0000";
+[PTBR+12] = -1;
+[PTBR+13] = "0000";
+[PTBR+14] = -1;
+[PTBR+15] = "0000";
+
+alias counter R4;
+alias blockNums R5;
+alias inodeCodeBlock R6;
+
+counter = 8;
+inodeCodeBlock = 8;
+blockNums = [INODE_TABLE + file*16 + 2]/512 + 1;
+
+// for page table offset, get a new page and also load the code block from Disk using INODE_TABLE
+while(blockNums != 0) do
+    multipush(R0,R1,R2,R3,R4,R5,R6);
+    R1 = 1;
+    call MOD_2;
+    R7 = R0;
+    multipop(R0,R1,R2,R3,R4,R5,R6);
+    [PTBR+counter] = R7;
+    [PTBR+counter+1] = "0100";
+    loadi(R7,[INODE_TABLE + file*16 + inodeCodeBlock]);
+    inodeCodeBlock = inodeCodeBlock + 1;
+    blockNums = blockNums - 1;
+    counter = counter + 2;
+endwhile;
+
+// entry point
+[[PTBR + 16] * 512] = [[PTBR + 8] * 512 + 1];
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13] = 8*512;
+
+// Mode Flag
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 0;
+
+SP = 8*512;
+PTLR = 10;
+PTBR = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 14];
+ireturn;

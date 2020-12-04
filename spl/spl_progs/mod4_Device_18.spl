@@ -1,0 +1,82 @@
+alias functionNum R1;
+alias currentPID R2;
+alias pageNum R3;
+alias blockNum R4;
+
+// ---- Disk Load (num = 2) ------
+if(functionNum == 2) then
+    // Call Acquire Disk function in the resource manager module (module 0)
+    multipush(R1, R2, R3, R4);
+    R1 = 3;
+    R2 = currentPID;
+    call MOD_0;
+    multipop(R1, R2, R3, R4);
+
+    // Disk Status table, LOAD, page, block
+    [DISK_STATUS_TABLE + 1] = 0;
+    [DISK_STATUS_TABLE + 2] = pageNum;
+    [DISK_STATUS_TABLE + 3] = blockNum;
+    
+    load(pageNum, blockNum);
+    [PROCESS_TABLE + currentPID*16 + 4] = WAIT_DISK;
+    
+    // Scheduler
+    multipush(R1, R2, R3, R4);
+    call SCHEDULER;
+    multipop(R1, R2, R3, R4);
+    return;
+endif;
+
+// ---- Terminal Write Function (num = 3) ----
+if(functionNum == 3) then
+// Acquire Terminal First
+    multipush(R1, R2, R3);
+    R1 = 8;
+    R2 = currentPID;
+    // Call Resource Manager
+    call MOD_0;
+    multipop(R1, R2, R3);
+
+
+// Print the word in R3
+    print(R3);
+
+// Release Terminal Now
+    multipush(R1, R2, R3);
+    R1 = 9;
+	R2 = currentPID;
+    // Call Resource Manager 
+	call MOD_0;
+	multipop(R1, R2, R3);
+	return;
+endif;
+
+// ---- Terminal Read Function (num = 4) ----
+if(functionNum == 4) then
+//Acquire Terminal
+    multipush(R1, R2, R3);
+    R1 = 8;
+    R2 = currentPID;
+    // Call Resource Manager
+    call MOD_0;
+
+	multipop(R1, R2, R3);
+// Read statement
+    read;
+// set STATE to waiting for terminal to Read.
+    [PROCESS_TABLE + currentPID * 16 + 4] = WAIT_TERMINAL;
+
+// MOD_5 for Context Switch (Scheduler)
+    multipush(R1, R2, R3);
+    call SCHEDULER;
+    multipop(R1, R2, R3);
+
+    // R3 has Logical address of the storage buffer, 
+    //offset 8 of Process Table has Input Buffer Field
+
+    alias physicalAddBuffer R4;
+	physicalAddBuffer = [PTBR + ( 2 * R3 ) / 512] * 512 + R3 % 512;
+	[physicalAddBuffer] = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE +1] * 16 + 8];
+
+    return;
+endif;

@@ -1,0 +1,203 @@
+//  MEMORY MANAGER 
+// Function Number	    Function Name	Arguments	         Return Value
+// GET_FREE_PAGE = 1	Get Free Page	NIL	                 Free Page number
+// RELEASE_PAGE = 2	    Release Page	Page Number	         NIL
+// GET_FREE_BLOCK = 3	Get Free Block	NIL	                 Free Block Number or -1
+// RELEASE_BLOCK = 4	Release Block	Block Number, PID	 NIL
+// GET_CODE_PAGE = 5	Get Code Page	Block Number	     Page Number
+// GET_SWAP_BLOCK = 6	Get Swap Block	NIL	                 Block Number
+
+alias functionNum R1;
+
+
+
+//GET_FREE_PAGE (1)
+// Args - NIL, 
+// Ret - Free Page Number
+// Returns the page number of a free page
+// Called by fork and exec system calls. Also called by exception handler on page fault.
+
+if( functionNum == 1 ) then
+
+    //Increment WAIT_MEM_COUNT in system status table
+    [SYSTEM_STATUS_TABLE + 3] = [SYSTEM_STATUS_TABLE + 3] + 1;
+
+    //While memory is full (MEM_FREE_COUNT will be 0)---- BUSY LOOP
+    while( [SYSTEM_STATUS_TABLE + 2] == 0) do
+        [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 4] = WAIT_MEM;
+        multipush(R1);
+        call SCHEDULER;
+        multipop(R1);
+    endwhile ;
+
+    //Decrement MEM_FREE_COUNT & WAIT_MEM_COUNT in system status table
+    [SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] - 1;
+    [SYSTEM_STATUS_TABLE + 3] = [SYSTEM_STATUS_TABLE + 3] - 1;
+
+    //Find a free page using memory free list
+    alias pageIdx R2;
+    pageIdx = 0;
+    while( pageIdx < 128 ) do
+        if( [MEMORY_FREE_LIST + pageIdx] == 0 ) then
+            R0 = pageIdx;
+            break;
+        endif ;
+        pageIdx = pageIdx + 1;
+    endwhile ;
+
+    [MEMORY_FREE_LIST + pageIdx] = 1;
+    
+    return;
+endif;
+
+//  RELEASE_PAGE (2)
+// Args - Page Number 
+// Return NIL
+// Decrements the entry corresponding to page in memory free list
+// Called by the Free page table and Free UArea Page functions.
+
+if( functionNum == 2 ) then
+    alias pageNum R2;
+    
+    //Decrement the corresponding entry in the memory free list
+    [MEMORY_FREE_LIST + pageNum] = [MEMORY_FREE_LIST + pageNum] - 1; 
+
+    //If that entry in the memory free list becomes zero, then the page is free
+    if( [MEMORY_FREE_LIST + pageNum] == 0 ) then
+            [SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] + 1;
+    endif ;
+
+    //STATE field of other process table entries with WAIT_MEM to READY
+    alias var R3;
+    var = 0;
+    while( var < 16 ) do
+        if( [PROCESS_TABLE + 16*var + 4] ==  WAIT_MEM) then
+            [PROCESS_TABLE + 16*var + 4] = READY;
+        endif ;
+        var = var + 1;
+    endwhile ;
+
+    return;
+endif;
+
+
+
+
+//GET_FREE_BLOCK = 3 
+// Args - NIL,Ret Free Block Number or -1
+// Returns the block number of a free disk block. Returns -1 if disk is full.
+
+if( functionNum == 3 ) then
+
+    // loop through entries in the Disk Free List from DISK_FREE_AREA to DISK_SWAP_AREA - 1
+    // ** User Block, not preallocated to the OS or swap area
+
+    alias blockIndex R2;
+    blockIndex = DISK_FREE_AREA;
+    while( blockIndex < DISK_SWAP_AREA - 1 ) do
+        if( [DISK_FREE_LIST + blockIndex] == 0 ) then
+            [DISK_FREE_LIST + blockIndex] = 1;
+            R0 = blockIndex;
+            break;
+        endif ;
+        blockIndex = blockIndex + 1;
+    endwhile ;
+    
+    return;
+endif;
+
+
+
+//RELEASE_BLOCK = 4 
+// Args - Block Number, PID
+// Return NIL
+
+// Decrements the entry corresponding to the disk block in the disk free list
+
+if( functionNum == 4 ) then
+    alias codeBlock R2;
+    alias currentPID R3;
+    [DISK_FREE_LIST + codeBlock] = [DISK_FREE_LIST + codeBlock] - 1;
+    return;
+endif;
+
+//GET_CODE_PAGE (5) 
+// Args - Block Number
+// Return Page Number
+// Loads a single code page to memory given the block number of the page in the disk
+
+if( functionNum == 5 ) then
+    alias codeBlock R2;
+
+    alias pid R3;
+    pid = 0;
+    alias diskMapTable R4;
+    alias cnt R5;
+    alias pageTable R6;
+    alias pageNo R7;
+    alias auxInfo R8;
+    
+    while( pid < 16 ) do
+        diskMapTable = DISK_MAP_TABLE + 10*pid;
+        pageTable = PAGE_TABLE_BASE + 20*pid + 8;
+        cnt = 0;
+        while(cnt < 4) do
+            auxInfo = [pageTable + cnt*2 + 1 ];
+            if( [diskMapTable + 4 + cnt] == codeBlock && (auxInfo == "0100" || auxInfo == "1100") ) then
+                //Increment entry in the memory free list
+                pageNo = [pageTable + cnt*2 ];
+                [MEMORY_FREE_LIST + pageNo] = [MEMORY_FREE_LIST + pageNo] + 1; 
+
+                //return page number
+                R0 = pageNo;
+                return;
+            endif ;
+            cnt = cnt + 1;
+        endwhile;
+        pid = pid + 1;
+    endwhile ;
+    
+    //code page is not in memory has to be loaded from disk 
+    //Calling Get Free Page function (memory manager) to allocate a new page.
+    multipush(R1, R2);
+    R1 = 1;
+    call MOD_2;
+    multipop(R1, R2);
+    
+     //Calling Disk load function 2 in device manager module (module 4)
+    multipush(R0, R1, R2); 
+    R4 = codeBlock; 
+    R3 = R0;
+    R2 = [SYSTEM_STATUS_TABLE + 1];
+    R1 = 2;
+    call MOD_4; 
+    multipop(R0, R1, R2);
+    R0 = R0;
+    breakpoint;
+    return;
+endif;
+
+
+//GET_SWAP_BLOCK(6) 
+// Args - NIL,
+// Ret Block Number
+// Returns the block number of a free disk block in the swap area
+
+if( functionNum == 6 ) then
+
+    // loop through entries in the Disk Free List from DISK_FREE_AREA to DISK_SWAP_AREA - 1
+    // ** User Block, not preallocated to the OS or swap area
+
+    alias blockIndex R2;
+    blockIndex = DISK_SWAP_AREA;
+    while( blockIndex < DISK_SIZE - 1 ) do
+        if( [DISK_FREE_LIST + blockIndex] == 0 ) then
+            [DISK_FREE_LIST + blockIndex] = 1;
+            R0 = blockIndex;
+            break;
+        endif ;
+        blockIndex = blockIndex + 1;
+    endwhile ;
+    
+    return;
+endif;
